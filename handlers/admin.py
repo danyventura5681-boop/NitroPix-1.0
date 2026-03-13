@@ -1,11 +1,16 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from database import get_user, get_user_by_id, add_diamonds, make_admin, ban_user, unban_user, get_all_users, is_admin
+from database import (
+    get_user, get_user_by_id, add_diamonds, make_admin, 
+    ban_user, unban_user, get_all_users, is_admin, get_user_stats
+)
 from utils.i18n import get_text
+from datetime import datetime
 
 WAITING_FOR_USER_ID, WAITING_FOR_AMOUNT = range(2)
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Muestra el panel de administración"""
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -17,9 +22,22 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_user = get_user(user_id)
     lang = db_user.language
     
-    text = "🛡️ **Admin Control Panel**\n\nSelect an option:"
+    # Obtener estadísticas
+    stats = get_user_stats()
+    
+    text = (
+        "🛡️ **Panel de Administrador**\n\n"
+        "📊 **Estadísticas de Usuarios:**\n"
+        f"👥 **Totales:** {stats['total']}\n"
+        f"📅 **Último mes:** +{stats['last_month']}\n"
+        f"📆 **Última semana:** +{stats['last_week']}\n"
+        f"⏰ **Últimas 48h:** +{stats['last_48h']}\n"
+        f"⚡ **Activos 48h:** {stats['active_48h']}\n\n"
+        "🛠️ **Acciones:**"
+    )
     
     keyboard = [
+        [InlineKeyboardButton("📊 Actualizar Estadísticas", callback_data='admin_stats')],
         [InlineKeyboardButton(get_text('admin_add_diamonds', lang), callback_data='admin_add_diamonds')],
         [InlineKeyboardButton(get_text('admin_make_admin', lang), callback_data='admin_make_admin')],
         [InlineKeyboardButton(get_text('admin_ban_user', lang), callback_data='admin_ban_user')],
@@ -30,7 +48,33 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Actualiza y muestra las estadísticas"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if not is_admin(user_id):
+        await query.edit_message_text(get_text('admin_not_admin', 'en'))
+        return
+    
+    stats = get_user_stats()
+    
+    text = (
+        "📊 **Estadísticas Actualizadas:**\n\n"
+        f"👥 **Usuarios totales:** {stats['total']}\n"
+        f"📅 **Último mes:** +{stats['last_month']}\n"
+        f"📆 **Última semana:** +{stats['last_week']}\n"
+        f"⏰ **Últimas 48h:** +{stats['last_48h']}\n"
+        f"⚡ **Activos últimas 48h:** {stats['active_48h']}\n\n"
+        f"🕒 *Actualizado: {datetime.utcnow().strftime('%d/%m/%Y %H:%M')} UTC*"
+    )
+    
+    keyboard = [[InlineKeyboardButton("◀️ Volver al Admin Panel", callback_data='admin_panel')]]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+
 async def admin_add_diamonds_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Inicia el proceso para añadir diamantes"""
     query = update.callback_query
     await query.answer()
     
@@ -46,6 +90,7 @@ async def admin_add_diamonds_start(update: Update, context: ContextTypes.DEFAULT
     return WAITING_FOR_USER_ID
 
 async def admin_add_diamonds_get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Recibe el ID del usuario y pide la cantidad"""
     try:
         target_user_id = int(update.message.text.strip())
         context.user_data['target_user_id'] = target_user_id
@@ -60,6 +105,7 @@ async def admin_add_diamonds_get_id(update: Update, context: ContextTypes.DEFAUL
         return WAITING_FOR_USER_ID
 
 async def admin_add_diamonds_get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Recibe la cantidad y añade los diamantes"""
     try:
         amount = float(update.message.text.strip())
         target_user_id = context.user_data['target_user_id']
@@ -91,6 +137,7 @@ async def admin_add_diamonds_get_amount(update: Update, context: ContextTypes.DE
         return WAITING_FOR_AMOUNT
 
 async def admin_make_admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Inicia el proceso para hacer admin a un usuario"""
     query = update.callback_query
     await query.answer()
     
@@ -103,6 +150,7 @@ async def admin_make_admin_start(update: Update, context: ContextTypes.DEFAULT_T
     return WAITING_FOR_USER_ID
 
 async def admin_make_admin_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa hacer admin a un usuario"""
     try:
         target_user_id = int(update.message.text.strip())
         
@@ -130,6 +178,7 @@ async def admin_make_admin_process(update: Update, context: ContextTypes.DEFAULT
         return WAITING_FOR_USER_ID
 
 async def admin_ban_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Inicia el proceso para banear un usuario"""
     query = update.callback_query
     await query.answer()
     
@@ -142,6 +191,7 @@ async def admin_ban_user_start(update: Update, context: ContextTypes.DEFAULT_TYP
     return WAITING_FOR_USER_ID
 
 async def admin_ban_user_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa banear a un usuario"""
     try:
         target_user_id = int(update.message.text.strip())
         
@@ -169,6 +219,7 @@ async def admin_ban_user_process(update: Update, context: ContextTypes.DEFAULT_T
         return WAITING_FOR_USER_ID
 
 async def admin_unban_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Inicia el proceso para desbanear un usuario"""
     query = update.callback_query
     await query.answer()
     
@@ -181,6 +232,7 @@ async def admin_unban_user_start(update: Update, context: ContextTypes.DEFAULT_T
     return WAITING_FOR_USER_ID
 
 async def admin_unban_user_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Procesa desbanear a un usuario"""
     try:
         target_user_id = int(update.message.text.strip())
         
@@ -208,6 +260,7 @@ async def admin_unban_user_process(update: Update, context: ContextTypes.DEFAULT
         return WAITING_FOR_USER_ID
 
 async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lista todos los usuarios"""
     query = update.callback_query
     await query.answer()
     
@@ -222,7 +275,8 @@ async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for user in users[:50]:
         admin_status = "👑" if user.is_admin else ""
         banned_status = "🚫" if user.is_banned else ""
-        text += f"{admin_status}{banned_status} ID: `{user.telegram_id}` | {user.first_name or 'No name'} | 💎{user.diamonds}\n"
+        created = user.created_at.strftime('%d/%m/%Y')
+        text += f"{admin_status}{banned_status} ID: `{user.telegram_id}` | {user.first_name or 'No name'} | 💎{user.diamonds} | 📅 {created}\n"
     
     if len(users) > 50:
         text += f"\n... and {len(users) - 50} more users."
@@ -231,5 +285,6 @@ async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancela la conversación actual"""
     await update.message.reply_text("Operation cancelled.")
     return ConversationHandler.END
