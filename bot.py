@@ -10,11 +10,13 @@ from handlers.referral import referral_code
 from handlers.daily import daily_reward
 from handlers.recharge import recharge_menu, handle_plan_selection, other_payment_methods
 from handlers.process import process_photo
+from handlers.effects import show_effects_menu, handle_effect_selection, process_effect
 from handlers.admin import (
     admin_panel, admin_add_diamonds_start, admin_add_diamonds_get_id,
     admin_add_diamonds_get_amount, admin_make_admin_start, admin_make_admin_process,
     admin_ban_user_start, admin_ban_user_process, admin_unban_user_start,
-    admin_unban_user_process, admin_list_users, cancel,
+    admin_unban_user_process, admin_list_users, admin_stats,
+    cancel,
     WAITING_FOR_USER_ID, WAITING_FOR_AMOUNT
 )
 from config import TOKEN
@@ -36,8 +38,10 @@ def main():
     app.add_handler(CallbackQueryHandler(recharge_menu, pattern="^recharge$"))
     app.add_handler(CallbackQueryHandler(handle_plan_selection, pattern="^plan_"))
     app.add_handler(CallbackQueryHandler(other_payment_methods, pattern="^other_payment$"))
-    app.add_handler(CallbackQueryHandler(process_photo, pattern="^process$"))
+    app.add_handler(CallbackQueryHandler(show_effects_menu, pattern="^effects$"))
+    app.add_handler(CallbackQueryHandler(handle_effect_selection, pattern="^effect_"))
     app.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
+    app.add_handler(CallbackQueryHandler(admin_stats, pattern="^admin_stats$"))
     
     # Conversation handlers para admin
     add_diamonds_conv = ConversationHandler(
@@ -81,11 +85,13 @@ def main():
     app.add_handler(unban_user_conv)
     app.add_handler(list_users_handler)
     
-    # Message handlers (para fotos)
-    app.add_handler(MessageHandler(filters.PHOTO, process_photo))
+    # Message handlers
+    app.add_handler(MessageHandler(filters.PHOTO, process_effect))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_photo))
 
     print("✨ NitroPix Bot iniciado correctamente!")
     print("👑 Admin user: @danyvg56")
+    print("🎨 Efectos: HD, Manga, Avatar, Figura, Dibujo, Artístico")
     app.run_polling()
 
 if __name__ == "__main__":
