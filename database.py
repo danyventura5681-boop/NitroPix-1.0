@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import string
 from config import DATABASE_URL
@@ -21,6 +21,7 @@ class User(Base):
     referred_by = Column(Integer, nullable=True)
     referral_code = Column(String, unique=True)
     last_daily = Column(DateTime, nullable=True)
+    last_active = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_admin = Column(Boolean, default=False)
     is_banned = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -168,3 +169,40 @@ def unban_user(telegram_id):
         return True
     session.close()
     return False
+
+def update_last_active(telegram_id):
+    """Actualiza la última actividad del usuario"""
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    if user:
+        user.last_active = datetime.utcnow()
+        session.commit()
+    session.close()
+
+def get_user_stats():
+    """Obtiene estadísticas de usuarios"""
+    session = SessionLocal()
+    
+    total_users = session.query(User).count()
+    
+    now = datetime.utcnow()
+    last_month = now - timedelta(days=30)
+    last_week = now - timedelta(days=7)
+    last_48h = now - timedelta(hours=48)
+    
+    month_users = session.query(User).filter(User.created_at >= last_month).count()
+    week_users = session.query(User).filter(User.created_at >= last_week).count()
+    last_48h_users = session.query(User).filter(User.created_at >= last_48h).count()
+    
+    # Usuarios activos en las últimas 48h (los que han hecho algo)
+    active_48h = session.query(User).filter(User.last_active >= last_48h).count()
+    
+    session.close()
+    
+    return {
+        "total": total_users,
+        "last_month": month_users,
+        "last_week": week_users,
+        "last_48h": last_48h_users,
+        "active_48h": active_48h
+    }
