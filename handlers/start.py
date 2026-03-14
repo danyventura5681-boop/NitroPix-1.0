@@ -65,18 +65,19 @@ async def ask_join_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Texto de invitación
     text = (
-        "🎉 **¡Únete a nuestra comunidad!** 🎉\n\n"
+        "💎 **¡Únete a nuestra comunidad!** 💎\n\n"
         "Antes de continuar, ¿te gustaría unirte al grupo oficial de NitroPix?\n"
         "✅ Obtén soporte\n"
         "✅ Conoce las últimas novedades\n"
         "✅ Participa en eventos exclusivos\n\n"
-        "👉 Haz clic en el botón de abajo para unirte, luego presiona **'Verifiqué'**."
+        "👉 Haz clic en el botón de abajo para unirte, luego presiona **'Verifiqué'**.\n\n"
+        "🎁 **Recompensa: +0.5💎 por unirte**"
     )
     
     keyboard = [
         [InlineKeyboardButton("📢 Unirme al Grupo", url=GROUP_LINK)],
         [InlineKeyboardButton("✅ Ya me uní / Verifiqué", callback_data='verify_group')],
-        [InlineKeyboardButton("⏭️ Omitir (No recomendado)", callback_data='skip_group')]
+        [InlineKeyboardButton("⏭️ Omitir", callback_data='skip_group')]
     ]
     
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
@@ -129,18 +130,18 @@ async def panel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = db_user.language
     username = db_user.first_name or db_user.username or "User"
     
-    # TEXTO DEL PANEL ORIGINAL (CORREGIDO)
+    # TEXTO DEL PANEL ORIGINAL
     text = get_text('panel_title', lang, 
                    username=username,
                    user_id=user_id,
                    balance=db_user.diamonds)
 
-    # BOTONES CON 💎 (CORREGIDO)
+    # BOTONES CON 💎
     keyboard = [
-        [InlineKeyboardButton("💎 **Compra VIP**", callback_data='recharge')],
+        [InlineKeyboardButton("💎 Comprar Diamantes", callback_data='recharge')],
         [InlineKeyboardButton("🚀 Invitar Amigos 💎", callback_data='referral')],
         [InlineKeyboardButton("🎁 Regalo Diario 💎", callback_data='daily')],
-        [InlineKeyboardButton("⚡️ ¡Procesa mi foto! 💎", callback_data='effects')]
+        [InlineKeyboardButton("⚡️ Procesa mi Foto 💎", callback_data='effects')]  # <-- Lleva a efectos
     ]
     
     # Si es admin, añadir botón de admin panel
