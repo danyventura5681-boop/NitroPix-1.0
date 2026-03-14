@@ -3,17 +3,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TOKEN = os.getenv("BOT_TOKEN")
-TRX_ADDRESS = "TK2K6W7vFehHLB6eQ9CPPjcJ1E6ErCu12Y"
+class Config:
+    BOT_TOKEN = os.getenv('BOT_TOKEN')
+    GROUP_LINK = os.getenv('GROUP_LINK', 'https://t.me/+_46_k-WxFRZkYzcx')
+    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///database.db')
+    ADMIN_IDS = [int(id) for id in os.getenv('ADMIN_IDS', '8248755019').split(',') if id]
+    WEBHOOK_URL = os.getenv('WEBHOOK_URL')
+    PORT = int(os.getenv('PORT', 8080))
+    
+    # Costos de efectos
+    EFFECT_COSTS = {
+        'avatar': 2,
+        'figura': 2,
+        'dibujo': 1,
+        'artistico': 2
+    }
+    
+    # Modelos de IA
+    AI_MODELS = {
+        'avatar': 'stabilityai/stable-diffusion-xl-base-1.0',
+        'figura': 'dreamshaper/dreamshaper_8',
+        'dibujo': 'runwayml/stable-diffusion-v1-5',
+        'artistico': 'stabilityai/stable-diffusion-2-1'
+    }
 
-# NUEVO: Link del grupo de Telegram
-GROUP_LINK = "https://t.me/+_46_k-WxFRZkYzcx"
-
-PLANS = {
-    "20": {"usd": 5, "diamonds": 20},
-    "50": {"usd": 10, "diamonds": 50},
-    "100": {"usd": 15, "diamonds": 100}
-}
-
-TRX_PER_USD = 10
-DATABASE_URL = "sqlite:///nitropix.db"
+config = Config()
