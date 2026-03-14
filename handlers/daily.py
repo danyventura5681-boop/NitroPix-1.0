@@ -17,9 +17,14 @@ async def daily_reward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if can_claim:
         new_balance = add_diamonds(user_id, 0.5)
         set_daily_claimed(user_id)
-        text = get_text('daily_success', lang, balance=new_balance)
+        text = (
+            f"🎁✨ **¡Regalo diario reclamado!** ✨🎁\n\n"
+            f"Has recibido **+0.5💎**\n\n"
+            f"💰 **Nuevo saldo:** {new_balance}💎\n\n"
+            f"¡Vuelve mañana por más!"
+        )
     else:
-        text = get_text('daily_already_claimed', lang, hours=hours)
+        text = f"⏳ **Ya reclamaste tu regalo hoy.**\n\nVuelve en **{hours} horas** para más 💎 gratis."
 
-    keyboard = [[InlineKeyboardButton(get_text('back_button', lang), callback_data='panel')]]
+    keyboard = [[InlineKeyboardButton("◀️ Volver al Panel", callback_data='panel')]]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
