@@ -1,98 +1,76 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+"""
+NitroPix Bot - Transforma tus fotos con IA
+"""
 
-from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler, 
-    MessageHandler, filters, ConversationHandler
-)
-from handlers.start import start, handle_language_selection, panel_menu
-from handlers.referral import referral_code
-from handlers.daily import daily_reward
-from handlers.recharge import recharge_menu, handle_plan_selection, other_payment_methods
-from handlers.process import process_photo
-from handlers.effects import show_effects_menu, handle_effect_selection, process_effect
-from handlers.admin import (
-    admin_panel, admin_add_diamonds_start, admin_add_diamonds_get_id,
-    admin_add_diamonds_get_amount, admin_make_admin_start, admin_make_admin_process,
-    admin_ban_user_start, admin_ban_user_process, admin_unban_user_start,
-    admin_unban_user_process, admin_list_users, admin_stats,
-    cancel,
-    WAITING_FOR_USER_ID, WAITING_FOR_AMOUNT
-)
-from config import TOKEN
 import logging
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ConversationHandler,
+    filters
+)
+from config import config
+from database import db
+from handlers import start, effects
 
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+# Configurar logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 def main():
-    app = Application.builder().token(TOKEN).build()
+    """Función principal del bot"""
+    
+    # Crear aplicación
+    application = Application.builder().token(config.BOT_TOKEN).build()
+    
+    # ===== HANDLERS =====
+    
+    # ConversationHandler para el inicio (verificación de grupo)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start.start)],
+        states={
+            start.WAITING_JOIN: [
+                CallbackQueryHandler(start.button_handler, pattern='^(lang_|verify_join)')
+            ]
+        },
+        fallbacks=[]
+    )
+    application.add_handler(conv_handler)
+    
+    # Handlers de efectos
+    application.add_handler(CallbackQueryHandler(effects.handle_effect, pattern='^effect_'))
+    
+    # Handlers de navegación
+    application.add_handler(CallbackQueryHandler(start.show_languages, pattern='^show_languages$'))
+    application.add_handler(CallbackQueryHandler(start.change_language, pattern='^change_lang_'))
+    application.add_handler(CallbackQueryHandler(start.button_handler, pattern='^back_to_menu$'))
+    
+    # Handler para fotos
+    application.add_handler(MessageHandler(filters.PHOTO, effects.handle_photo))
+    
+    # ===== INICIAR BOT =====
+    
+    # Determinar modo de ejecución (webhook o polling)
+    if config.WEBHOOK_URL:
+        # Modo webhook (para producción en Render)
+        logger.info(f"Iniciando bot en modo webhook en puerto {config.PORT}")
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=config.PORT,
+            url_path=config.BOT_TOKEN,
+            webhook_url=f"{config.WEBHOOK_URL}/{config.BOT_TOKEN}"
+        )
+    else:
+        # Modo polling (para desarrollo local)
+        logger.info("Iniciando bot en modo polling")
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-    # Command handlers
-    app.add_handler(CommandHandler("start", start))
-    
-    # Callback query handlers
-    app.add_handler(CallbackQueryHandler(handle_language_selection, pattern="^lang_"))
-    app.add_handler(CallbackQueryHandler(panel_menu, pattern="^panel$"))
-    app.add_handler(CallbackQueryHandler(referral_code, pattern="^referral$"))
-    app.add_handler(CallbackQueryHandler(daily_reward, pattern="^daily$"))
-    app.add_handler(CallbackQueryHandler(recharge_menu, pattern="^recharge$"))
-    app.add_handler(CallbackQueryHandler(handle_plan_selection, pattern="^plan_"))
-    app.add_handler(CallbackQueryHandler(other_payment_methods, pattern="^other_payment$"))
-    app.add_handler(CallbackQueryHandler(show_effects_menu, pattern="^effects$"))
-    app.add_handler(CallbackQueryHandler(handle_effect_selection, pattern="^effect_"))
-    app.add_handler(CallbackQueryHandler(admin_panel, pattern="^admin_panel$"))
-    app.add_handler(CallbackQueryHandler(admin_stats, pattern="^admin_stats$"))
-    
-    # Conversation handlers para admin
-    add_diamonds_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_add_diamonds_start, pattern="^admin_add_diamonds$")],
-        states={
-            WAITING_FOR_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_diamonds_get_id)],
-            WAITING_FOR_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_add_diamonds_get_amount)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    
-    make_admin_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_make_admin_start, pattern="^admin_make_admin$")],
-        states={
-            WAITING_FOR_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_make_admin_process)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    
-    ban_user_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_ban_user_start, pattern="^admin_ban_user$")],
-        states={
-            WAITING_FOR_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_ban_user_process)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    
-    unban_user_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(admin_unban_user_start, pattern="^admin_unban_user$")],
-        states={
-            WAITING_FOR_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, admin_unban_user_process)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    
-    list_users_handler = CallbackQueryHandler(admin_list_users, pattern="^admin_list_users$")
-    
-    app.add_handler(add_diamonds_conv)
-    app.add_handler(make_admin_conv)
-    app.add_handler(ban_user_conv)
-    app.add_handler(unban_user_conv)
-    app.add_handler(list_users_handler)
-    
-    # Message handlers
-    app.add_handler(MessageHandler(filters.PHOTO, process_effect))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_photo))
-
-    print("✨ NitroPix Bot iniciado correctamente!")
-    print("👑 Admin user: @danyvg56")
-    print("🎨 Efectos: HD, Manga, Avatar, Figura, Dibujo, Artístico")
-    app.run_polling()
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
