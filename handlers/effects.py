@@ -130,3 +130,6 @@ async def process_effect(update: Update, context: ContextTypes.DEFAULT_TYPE, eff
             os.remove(output_path)
         except:
             pass
+git add .
+git commit -m "fix: stable effects handler for render"
+git push
