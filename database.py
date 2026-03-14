@@ -12,7 +12,6 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = 'users'
-joined_group = Column(Boolean, default=False)
     id = Column(Integer, primary_key=True)
     telegram_id = Column(Integer, unique=True, nullable=False)
     username = Column(String)
@@ -22,12 +21,17 @@ joined_group = Column(Boolean, default=False)
     referred_by = Column(Integer, nullable=True)
     referral_code = Column(String, unique=True)
     last_daily = Column(DateTime, nullable=True)
-    last_active = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_active = Column(DateTime, default=datetime.utcnow)
+    joined_group = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
     is_banned = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(engine)
+
+# ===========================================
+# FUNCIONES BÁSICAS DE USUARIO
+# ===========================================
 
 def get_user(telegram_id):
     session = SessionLocal()
@@ -83,6 +87,18 @@ def update_user_language(telegram_id, language):
         session.commit()
     session.close()
 
+def update_last_active(telegram_id):
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    if user:
+        user.last_active = datetime.utcnow()
+        session.commit()
+    session.close()
+
+# ===========================================
+# FUNCIONES DE DIAMANTES
+# ===========================================
+
 def add_diamonds(telegram_id, amount):
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=telegram_id).first()
@@ -102,6 +118,10 @@ def deduct_diamond(telegram_id):
         return True
     session.close()
     return False
+
+# ===========================================
+# FUNCIONES DE REGALO DIARIO
+# ===========================================
 
 def can_claim_daily(telegram_id):
     session = SessionLocal()
@@ -124,6 +144,10 @@ def set_daily_claimed(telegram_id):
         session.commit()
     session.close()
 
+# ===========================================
+# FUNCIONES DE ADMINISTRACIÓN
+# ===========================================
+
 def is_admin(telegram_id):
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=telegram_id).first()
@@ -141,6 +165,10 @@ def make_admin(telegram_id):
         return True
     session.close()
     return False
+
+# ===========================================
+# FUNCIONES DE BANEO
+# ===========================================
 
 def is_banned(telegram_id):
     session = SessionLocal()
@@ -171,14 +199,30 @@ def unban_user(telegram_id):
     session.close()
     return False
 
-def update_last_active(telegram_id):
-    """Actualiza la última actividad del usuario"""
+# ===========================================
+# FUNCIONES DEL GRUPO
+# ===========================================
+
+def set_user_joined_group(telegram_id):
+    """Marca que el usuario ya verificó que se unió al grupo"""
     session = SessionLocal()
     user = session.query(User).filter_by(telegram_id=telegram_id).first()
     if user:
-        user.last_active = datetime.utcnow()
+        user.joined_group = True
         session.commit()
     session.close()
+
+def has_joined_group(telegram_id):
+    """Verifica si el usuario ya confirmó que se unió al grupo"""
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    result = user.joined_group if user else False
+    session.close()
+    return result
+
+# ===========================================
+# FUNCIONES DE ESTADÍSTICAS
+# ===========================================
 
 def get_user_stats():
     """Obtiene estadísticas de usuarios"""
@@ -195,7 +239,7 @@ def get_user_stats():
     week_users = session.query(User).filter(User.created_at >= last_week).count()
     last_48h_users = session.query(User).filter(User.created_at >= last_48h).count()
     
-    # Usuarios activos en las últimas 48h (los que han hecho algo)
+    # Usuarios activos en las últimas 48h
     active_48h = session.query(User).filter(User.last_active >= last_48h).count()
     
     session.close()
@@ -206,20 +250,4 @@ def get_user_stats():
         "last_week": week_users,
         "last_48h": last_48h_users,
         "active_48h": active_48h
-def set_user_joined_group(telegram_id):
-    """Marca que el usuario ya verificó que se unió al grupo"""
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user:
-        user.joined_group = True  # Necesitas añadir este campo a la tabla User
-        session.commit()
-    session.close()
-
-def has_joined_group(telegram_id):
-    """Verifica si el usuario ya confirmó que se unió al grupo"""
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    result = user.joined_group if user else False
-    session.close()
-    return result
     }
