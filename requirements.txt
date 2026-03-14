@@ -1,11 +1,6 @@
 python-telegram-bot==20.7
 python-dotenv==1.0.0
-pillow>=9.5.0,<10.0.0 --platform=manylinux2014_x86_64
+Pillow==9.5.0
 requests==2.31.0
-diffusers==0.24.0
-transformers==4.36.0
-torch==2.1.0
-accelerate==0.25.0
-safetensors==0.4.1
-opencv-python==4.8.1
+opencv-python-headless==4.8.1.78
 aiofiles==23.2.1
