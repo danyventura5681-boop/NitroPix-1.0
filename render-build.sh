@@ -1,26 +1,20 @@
 #!/usr/bin/env bash
-# render-build.sh
-# Script de compilación para Render que instala dependencias del sistema
+# render-build.sh - Sin apt-get (compatible con plan Free)
 
-set -e  # Salir si hay error
+set -e
+echo "=== Iniciando build en Render (plan Free) ==="
 
-echo "=== Instalando dependencias del sistema para Pillow y OpenCV ==="
-apt-get update && apt-get install -y \
-    libjpeg-dev \
-    zlib1g-dev \
-    libpng-dev \
-    libtiff-dev \
-    libfreetype6-dev \
-    liblcms2-dev \
-    libwebp-dev \
-    libharfbuzz-dev \
-    libfribidi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+# Actualizar pip
 echo "=== Actualizando pip ==="
 pip install --upgrade pip
 
-echo "=== Instalando dependencias de Python ==="
+# Instalar dependencias (forzar uso de wheels)
+echo "=== Instalando dependencias con wheels ==="
+pip install --only-binary=:all: Pillow==10.1.0
 pip install -r requirements.txt
+
+# Verificar instalación
+echo "=== Verificando instalación ==="
+python -c "from PIL import Image; print('✅ Pillok instalado correctamente')" || echo "❌ Error con Pillow"
 
 echo "=== Build completado exitosamente ==="
