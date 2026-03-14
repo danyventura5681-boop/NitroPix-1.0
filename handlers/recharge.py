@@ -13,16 +13,20 @@ async def recharge_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     lang = db_user.language
-    text = get_text('recharge_title', lang)
+    
+    text = (
+        "💎 **Compra Diamantes - Elige tu paquete** 💎\n\n"
+        "Selecciona la cantidad de 💎 que deseas:"
+    )
 
     keyboard = []
     for key, plan in PLANS.items():
         trx_amount = plan['usd'] * TRX_PER_USD
-        btn_text = get_text(f'plan_{key}', lang, usd=plan['usd'], trx=trx_amount)
+        btn_text = f"{plan['diamonds']}💎 - ${plan['usd']} USD (≈ {trx_amount} TRX)"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"plan_{key}")])
     
-    keyboard.append([InlineKeyboardButton(get_text('other_payment', lang), callback_data='other_payment')])
-    keyboard.append([InlineKeyboardButton(get_text('back_button', lang), callback_data='panel')])
+    keyboard.append([InlineKeyboardButton("💳 Otros Métodos de Pago", callback_data='other_payment')])
+    keyboard.append([InlineKeyboardButton("◀️ Volver al Panel", callback_data='panel')])
 
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -46,7 +50,7 @@ async def handle_plan_selection(update: Update, context: ContextTypes.DEFAULT_TY
                    trx=trx_amount, 
                    address=TRX_ADDRESS)
 
-    keyboard = [[InlineKeyboardButton(get_text('back_button', lang), callback_data='panel')]]
+    keyboard = [[InlineKeyboardButton("◀️ Volver al Panel", callback_data='panel')]]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def other_payment_methods(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -60,5 +64,5 @@ async def other_payment_methods(update: Update, context: ContextTypes.DEFAULT_TY
     lang = db_user.language
     text = get_text('other_payment_text', lang)
 
-    keyboard = [[InlineKeyboardButton(get_text('back_button', lang), callback_data='panel')]]
+    keyboard = [[InlineKeyboardButton("◀️ Volver al Panel", callback_data='panel')]]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
