@@ -5,12 +5,12 @@ from starlette.responses import Response, PlainTextResponse
 from starlette.routing import Route
 import uvicorn
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler
 
 # Configuración básica
 TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
-    raise ValueError("No BOT_TOKEN found")
+    raise ValueError("❌ No BOT_TOKEN found in environment variables")
 
 PORT = int(os.environ.get("PORT", 8000))
 URL = os.environ.get("RENDER_EXTERNAL_URL", f"https://localhost:{PORT}")
@@ -23,43 +23,36 @@ logger = logging.getLogger(__name__)
 # Crear aplicación de Telegram
 telegram_app = Application.builder().token(TOKEN).build()
 
-# ===========================================
-# HANDLERS BÁSICOS PARA PROBAR
-# ===========================================
-
+# Handler simple
 async def start(update: Update, context):
-    await update.message.reply_text("✅ Bot funcionando con webhooks!")
+    await update.message.reply_text("✅ NitroPix funcionando con webhooks!")
 
-async def echo(update: Update, context):
-    await update.message.reply_text(update.message.text)
-
-# Registrar handlers
 telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
-# ===========================================
-# WEBHOOK HANDLER
-# ===========================================
+# Webhook handler
 async def telegram_webhook(request):
     try:
-        request_data = await request.json()
-        update = Update.de_json(request_data, telegram_app.bot)
+        data = await request.json()
+        update = Update.de_json(data, telegram_app.bot)
         await telegram_app.update_queue.put(update)
         return Response("ok", status_code=200)
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error en webhook: {e}")
         return Response("error", status_code=500)
 
+# Health check para Render
 async def health_check(request):
     return PlainTextResponse("OK")
 
+# Configurar webhook al inicio
 async def setup_webhook():
     await telegram_app.initialize()
     await telegram_app.bot.set_webhook(
         url=WEBHOOK_URL,
         drop_pending_updates=True
     )
-    logger.info(f"✅ Webhook OK: {WEBHOOK_URL}")
+    logger.info(f"✅ Webhook configurado en: {WEBHOOK_URL}")
+    logger.info("✅ Bot listo para recibir mensajes")
 
 # App Starlette
 app = Starlette(
@@ -72,4 +65,5 @@ app = Starlette(
 )
 
 if __name__ == "__main__":
+    logger.info(f"🚀 Iniciando servidor en puerto {PORT}")
     uvicorn.run(app, host="0.0.0.0", port=PORT)
