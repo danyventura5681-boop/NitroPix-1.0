@@ -1,3 +1,8 @@
 python-telegram-bot>=20.0
 sqlalchemy
 python-dotenv
+pillow
+replicate
+requests
+uvicorn
+starlette
