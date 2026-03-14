@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# render-build.sh - Sin apt-get (compatible con plan Free)
-
 set -e
-echo "=== Iniciando build en Render (plan Free) ==="
+echo "=== Iniciando build en Render ==="
 
 # Actualizar pip
 echo "=== Actualizando pip ==="
 pip install --upgrade pip
 
-# Instalar dependencias (forzar uso de wheels)
-echo "=== Instalando dependencias con wheels ==="
-pip install --only-binary=:all: Pillow==10.1.0
+# Instalar dependencias
+echo "=== Instalando dependencias ==="
 pip install -r requirements.txt
 
-# Verificar instalación
 echo "=== Verificando instalación ==="
-python -c "from PIL import Image; print('✅ Pillok instalado correctamente')" || echo "❌ Error con Pillow"
+python -c "from PIL import Image; print('✅ Pillow 9.5.0 instalado correctamente')"
 
-echo "=== Build completado exitosamente ==="
+echo "=== Build completado ==="
