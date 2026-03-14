@@ -12,6 +12,7 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = 'users'
+joined_group = Column(Boolean, default=False)
     id = Column(Integer, primary_key=True)
     telegram_id = Column(Integer, unique=True, nullable=False)
     username = Column(String)
@@ -205,4 +206,20 @@ def get_user_stats():
         "last_week": week_users,
         "last_48h": last_48h_users,
         "active_48h": active_48h
+def set_user_joined_group(telegram_id):
+    """Marca que el usuario ya verificó que se unió al grupo"""
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    if user:
+        user.joined_group = True  # Necesitas añadir este campo a la tabla User
+        session.commit()
+    session.close()
+
+def has_joined_group(telegram_id):
+    """Verifica si el usuario ya confirmó que se unió al grupo"""
+    session = SessionLocal()
+    user = session.query(User).filter_by(telegram_id=telegram_id).first()
+    result = user.joined_group if user else False
+    session.close()
+    return result
     }
