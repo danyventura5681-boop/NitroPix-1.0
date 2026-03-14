@@ -1,253 +1,165 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta
-import random
-import string
-from config import DATABASE_URL
+import sqlite3
+import json
+from datetime import datetime
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
-
-class User(Base):
-    __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(Integer, unique=True, nullable=False)
-    username = Column(String)
-    first_name = Column(String)
-    language = Column(String, default='en')
-    diamonds = Column(Float, default=5.0)
-    referred_by = Column(Integer, nullable=True)
-    referral_code = Column(String, unique=True)
-    last_daily = Column(DateTime, nullable=True)
-    last_active = Column(DateTime, default=datetime.utcnow)
-    joined_group = Column(Boolean, default=False)
-    is_admin = Column(Boolean, default=False)
-    is_banned = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-Base.metadata.create_all(engine)
-
-# ===========================================
-# FUNCIONES BÁSICAS DE USUARIO
-# ===========================================
-
-def get_user(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    session.close()
-    return user
-
-def get_user_by_referral_code(code):
-    session = SessionLocal()
-    user = session.query(User).filter_by(referral_code=code).first()
-    session.close()
-    return user
-
-def get_user_by_id(user_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=user_id).first()
-    session.close()
-    return user
-
-def get_all_users():
-    session = SessionLocal()
-    users = session.query(User).all()
-    session.close()
-    return users
-
-def create_user(telegram_id, username, first_name, referred_by=None):
-    session = SessionLocal()
-    ref_code = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-    user = User(
-        telegram_id=telegram_id,
-        username=username,
-        first_name=first_name,
-        referral_code=ref_code,
-        diamonds=5.0
-    )
-    if referred_by:
-        referrer = session.query(User).filter_by(telegram_id=referred_by).first()
-        if referrer:
-            user.referred_by = referred_by
-            referrer.diamonds += 3
-            user.diamonds += 3
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    session.close()
-    return user
-
-def update_user_language(telegram_id, language):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user:
-        user.language = language
-        session.commit()
-    session.close()
-
-def update_last_active(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user:
-        user.last_active = datetime.utcnow()
-        session.commit()
-    session.close()
-
-# ===========================================
-# FUNCIONES DE DIAMANTES
-# ===========================================
-
-def add_diamonds(telegram_id, amount):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user:
-        user.diamonds += amount
-        session.commit()
-        new_balance = user.diamonds
-    session.close()
-    return new_balance
-
-def deduct_diamond(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user and user.diamonds >= 1:
-        user.diamonds -= 1
-        session.commit()
-        return True
-    session.close()
-    return False
-
-# ===========================================
-# FUNCIONES DE REGALO DIARIO
-# ===========================================
-
-def can_claim_daily(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if not user or not user.last_daily:
-        return True, 0
-    time_diff = datetime.utcnow() - user.last_daily
-    if time_diff.total_seconds() >= 86400:
-        return True, 0
-    else:
-        remaining = 86400 - time_diff.total_seconds()
-        hours = int(remaining // 3600)
-        return False, hours
-
-def set_daily_claimed(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user:
-        user.last_daily = datetime.utcnow()
-        session.commit()
-    session.close()
-
-# ===========================================
-# FUNCIONES DE ADMINISTRACIÓN
-# ===========================================
-
-def is_admin(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    result = user.is_admin if user else False
-    session.close()
-    return result
-
-def make_admin(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user and not user.is_admin:
-        user.is_admin = True
-        session.commit()
-        session.close()
-        return True
-    session.close()
-    return False
-
-# ===========================================
-# FUNCIONES DE BANEO
-# ===========================================
-
-def is_banned(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    result = user.is_banned if user else False
-    session.close()
-    return result
-
-def ban_user(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user and not user.is_banned:
-        user.is_banned = True
-        session.commit()
-        session.close()
-        return True
-    session.close()
-    return False
-
-def unban_user(telegram_id):
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user and user.is_banned:
-        user.is_banned = False
-        session.commit()
-        session.close()
-        return True
-    session.close()
-    return False
-
-# ===========================================
-# FUNCIONES DEL GRUPO
-# ===========================================
-
-def set_user_joined_group(telegram_id):
-    """Marca que el usuario ya verificó que se unió al grupo"""
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    if user:
-        user.joined_group = True
-        session.commit()
-    session.close()
-
-def has_joined_group(telegram_id):
-    """Verifica si el usuario ya confirmó que se unió al grupo"""
-    session = SessionLocal()
-    user = session.query(User).filter_by(telegram_id=telegram_id).first()
-    result = user.joined_group if user else False
-    session.close()
-    return result
-
-# ===========================================
-# FUNCIONES DE ESTADÍSTICAS
-# ===========================================
-
-def get_user_stats():
-    """Obtiene estadísticas de usuarios"""
-    session = SessionLocal()
+class Database:
+    def __init__(self, db_path='database.db'):
+        self.db_path = db_path
+        self.init_db()
     
-    total_users = session.query(User).count()
+    def init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            
+            # Tabla de usuarios
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    balance REAL DEFAULT 3.5,
+                    language TEXT DEFAULT 'es',
+                    joined_group BOOLEAN DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_active TIMESTAMP
+                )
+            ''')
+            
+            # Tabla de transacciones
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    amount REAL,
+                    effect TEXT,
+                    status TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            ''')
+            
+            # Tabla de imágenes generadas
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS generated_images (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    effect TEXT,
+                    image_path TEXT,
+                    prompt TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            ''')
+            
+            conn.commit()
     
-    now = datetime.utcnow()
-    last_month = now - timedelta(days=30)
-    last_week = now - timedelta(days=7)
-    last_48h = now - timedelta(hours=48)
+    # ====== MÉTODOS DE USUARIO ======
     
-    month_users = session.query(User).filter(User.created_at >= last_month).count()
-    week_users = session.query(User).filter(User.created_at >= last_week).count()
-    last_48h_users = session.query(User).filter(User.created_at >= last_48h).count()
+    def get_user(self, user_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+            return cursor.fetchone()
     
-    # Usuarios activos en las últimas 48h
-    active_48h = session.query(User).filter(User.last_active >= last_48h).count()
+    def create_user(self, user_id, username, first_name):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR IGNORE INTO users (user_id, username, first_name, balance, joined_group)
+                VALUES (?, ?, ?, 3.5, 0)
+            ''', (user_id, username, first_name))
+            conn.commit()
     
-    session.close()
+    def update_last_active(self, user_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET last_active = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+            ''', (user_id,))
+            conn.commit()
     
-    return {
-        "total": total_users,
-        "last_month": month_users,
-        "last_week": week_users,
-        "last_48h": last_48h_users,
-        "active_48h": active_48h
-    }
+    # ====== MÉTODOS DE SALDO ======
+    
+    def get_balance(self, user_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
+            result = cursor.fetchone()
+            return result[0] if result else 0
+    
+    def update_balance(self, user_id, amount):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET balance = balance + ? WHERE user_id = ?
+            ''', (amount, user_id))
+            conn.commit()
+            
+            # Registrar transacción
+            cursor.execute('''
+                INSERT INTO transactions (user_id, amount, status)
+                VALUES (?, ?, ?)
+            ''', (user_id, amount, 'completed' if amount < 0 else 'purchase'))
+            conn.commit()
+            
+            return self.get_balance(user_id)
+    
+    # ====== MÉTODOS DE GRUPO ======
+    
+    def set_joined_group(self, user_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET joined_group = 1 WHERE user_id = ?
+            ''', (user_id,))
+            conn.commit()
+    
+    def has_joined_group(self, user_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT joined_group FROM users WHERE user_id = ?', (user_id,))
+            result = cursor.fetchone()
+            return result[0] if result else 0
+    
+    # ====== MÉTODOS DE IDIOMA ======
+    
+    def set_language(self, user_id, language):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET language = ? WHERE user_id = ?
+            ''', (language, user_id))
+            conn.commit()
+    
+    def get_language(self, user_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT language FROM users WHERE user_id = ?', (user_id,))
+            result = cursor.fetchone()
+            return result[0] if result else 'es'
+    
+    # ====== MÉTODOS DE IMÁGENES ======
+    
+    def save_generated_image(self, user_id, effect, image_path, prompt=None):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO generated_images (user_id, effect, image_path, prompt)
+                VALUES (?, ?, ?, ?)
+            ''', (user_id, effect, image_path, prompt))
+            conn.commit()
+            return cursor.lastrowid
+    
+    def get_user_images(self, user_id, limit=10):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM generated_images 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT ?
+            ''', (user_id, limit))
+            return cursor.fetchall()
+
+db = Database()
