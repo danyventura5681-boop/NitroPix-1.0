@@ -1,156 +1,209 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-from database import get_user, create_user, update_user_language, get_user_by_referral_code, is_banned, has_joined_group, set_user_joined_group
-from utils.i18n import get_text
-from config import GROUP_LINK
+from telegram.ext import ContextTypes, ConversationHandler
+from database import db
+from config import config
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Estados
+WAITING_JOIN = 1
+
+# Textos multilenguaje
+TEXTS = {
+    'es': {
+        'welcome': "🎨 ¡Bienvenido a NitroPix, {name}!\n\nPara usar el bot, primero debes unirte a nuestro grupo oficial:",
+        'welcome_back': "🎨 ¡Bienvenido de nuevo, {name}!",
+        'join_group': "🔗 Unirse al Grupo",
+        'verify': "✅ Verificar y Continuar",
+        'not_joined': "❌ Aún no te has unido. Por favor, únete al grupo y haz clic en 'Verificar'",
+        'verified': "✅ ¡Verificado! Bienvenido a NitroPix",
+        'main_menu': "📱 Panel Principal",
+        'balance': "💰 Saldo: {balance} diamantes",
+        'select_effect': "✨ Selecciona un efecto mágico:",
+        'language': "🌐 Idioma",
+        'buy': "💎 Comprar Diamantes",
+        'effects': {
+            'avatar': "✨ Crear Avatar",
+            'figura': "🎭 Figura de Acción",
+            'dibujo': "✏️ Convertir en Dibujo",
+            'artistico': "🎨 Diseño Artístico"
+        }
+    },
+    'en': {
+        'welcome': "🎨 Welcome to NitroPix, {name}!\n\nTo use the bot, you must first join our official group:",
+        'welcome_back': "🎨 Welcome back, {name}!",
+        'join_group': "🔗 Join Group",
+        'verify': "✅ Verify and Continue",
+        'not_joined': "❌ You haven't joined yet. Please join the group and click 'Verify'",
+        'verified': "✅ Verified! Welcome to NitroPix",
+        'main_menu': "📱 Main Panel",
+        'balance': "💰 Balance: {balance} diamonds",
+        'select_effect': "✨ Select a magic effect:",
+        'language': "🌐 Language",
+        'buy': "💎 Buy Diamonds",
+        'effects': {
+            'avatar': "✨ Create Avatar",
+            'figura': "🎭 Action Figure",
+            'dibujo': "✏️ Convert to Drawing",
+            'artistico': "🎨 Artistic Design"
+        }
+    }
+}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    telegram_id = user.id
+    user_id = user.id
     
-    if is_banned(telegram_id):
-        await update.message.reply_text(get_text('user_banned', 'en'))
-        return
+    # Crear o actualizar usuario
+    db.create_user(user_id, user.username, user.first_name)
+    db.update_last_active(user_id)
     
-    args = context.args
-
-    referred_by = None
-    if args and args[0].startswith('ref_'):
-        ref_code = args[0][4:]
-        referrer = get_user_by_referral_code(ref_code)
-        if referrer:
-            referred_by = referrer.telegram_id
-
-    db_user = get_user(telegram_id)
-    if not db_user:
-        db_user = create_user(telegram_id, user.username, user.first_name, referred_by)
-        await update.message.reply_text(
-            get_text('welcome', 'en') + "\n\n" + get_text('choose_language', 'en'),
-            reply_markup=language_keyboard()
-        )
-    else:
-        await update.message.reply_text(
-            get_text('choose_language', db_user.language),
-            reply_markup=language_keyboard()
-        )
-
-def language_keyboard():
+    # Verificar si ya se unió al grupo
+    if db.has_joined_group(user_id):
+        await show_main_menu(update, context)
+        return ConversationHandler.END
+    
+    # Mostrar mensaje de bienvenida con selector de idioma
     keyboard = [
-        [InlineKeyboardButton("English 🇬🇧", callback_data="lang_en")],
-        [InlineKeyboardButton("Español 🇪🇸", callback_data="lang_es")]
+        [
+            InlineKeyboardButton("🇪🇸 Español", callback_data="lang_es"),
+            InlineKeyboardButton("🇺🇸 English", callback_data="lang_en")
+        ],
+        [InlineKeyboardButton(TEXTS['es']['join_group'], url=config.GROUP_LINK)],
+        [InlineKeyboardButton(TEXTS['es']['verify'], callback_data="verify_join")]
     ]
-    return InlineKeyboardMarkup(keyboard)
-
-async def handle_language_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    lang = query.data.split('_')[1]
-    telegram_id = query.from_user.id
-
-    update_user_language(telegram_id, lang)
-    await query.edit_message_text(get_text('language_selected', lang))
-    
-    # Después de elegir idioma, preguntar si quiere unirse al grupo
-    await ask_join_group(update, context)
-
-async def ask_join_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Pregunta al usuario si quiere unirse al grupo oficial"""
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    # Si ya se unió antes, ir directo al panel
-    if has_joined_group(user_id):
-        await panel_menu(update, context)
-        return
-    
-    # Texto de invitación
-    text = (
-        "💎 **¡Únete a nuestra comunidad!** 💎\n\n"
-        "Antes de continuar, ¿te gustaría unirte al grupo oficial de NitroPix?\n"
-        "✅ Obtén soporte\n"
-        "✅ Conoce las últimas novedades\n"
-        "✅ Participa en eventos exclusivos\n\n"
-        "👉 Haz clic en el botón de abajo para unirte, luego presiona **'Verifiqué'**.\n\n"
-        "🎁 **Recompensa: +0.5💎 por unirte**"
-    )
-    
-    keyboard = [
-        [InlineKeyboardButton("📢 Unirme al Grupo", url=GROUP_LINK)],
-        [InlineKeyboardButton("✅ Ya me uní / Verifiqué", callback_data='verify_group')],
-        [InlineKeyboardButton("⏭️ Omitir", callback_data='skip_group')]
-    ]
-    
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
-
-async def verify_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Verifica que el usuario dice que se unió"""
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    
-    # Marcar en base de datos
-    set_user_joined_group(user_id)
-    
-    # Dar una pequeña recompensa por unirse
-    from database import add_diamonds
-    new_balance = add_diamonds(user_id, 0.5)
-    
-    await query.edit_message_text(
-        f"✅ **¡Gracias por unirte!**\n\nHas recibido **+0.5💎** como bienvenida.\n\n💰 Nuevo saldo: {new_balance}💎\n\nCargando tu panel...",
-        parse_mode='Markdown'
-    )
-    await panel_menu(update, context)
-
-async def skip_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Usuario omite unirse al grupo"""
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("⏭️ Omitido. Puedes unirte más tarde desde el menú.")
-    await panel_menu(update, context)
-
-async def panel_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.callback_query:
-        query = update.callback_query
-        user_id = query.from_user.id
-    else:
-        user_id = update.effective_user.id
-        query = None
-
-    if is_banned(user_id):
-        if query:
-            await query.edit_message_text(get_text('user_banned', 'en'))
-        else:
-            await update.message.reply_text(get_text('user_banned', 'en'))
-        return
-
-    db_user = get_user(user_id)
-    if not db_user:
-        return
-
-    lang = db_user.language
-    username = db_user.first_name or db_user.username or "User"
-    
-    # TEXTO DEL PANEL ORIGINAL
-    text = get_text('panel_title', lang, 
-                   username=username,
-                   user_id=user_id,
-                   balance=db_user.diamonds)
-
-    # BOTONES CON 💎
-    keyboard = [
-        [InlineKeyboardButton("💎 Comprar Diamantes", callback_data='recharge')],
-        [InlineKeyboardButton("🚀 Invitar Amigos 💎", callback_data='referral')],
-        [InlineKeyboardButton("🎁 Regalo Diario 💎", callback_data='daily')],
-        [InlineKeyboardButton("⚡️ Procesa mi Foto 💎", callback_data='effects')]  # <-- Lleva a efectos
-    ]
-    
-    # Si es admin, añadir botón de admin panel
-    if db_user.is_admin:
-        keyboard.append([InlineKeyboardButton("🛡️ Admin Panel", callback_data='admin_panel')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        TEXTS['es']['welcome'].format(name=user.first_name),
+        reply_markup=reply_markup
+    )
+    
+    return WAITING_JOIN
 
-    if query:
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
-    else:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    data = query.data
+    
+    # Cambiar idioma
+    if data.startswith("lang_"):
+        lang = data.split("_")[1]
+        db.set_language(user_id, lang)
+        
+        # Actualizar mensaje con nuevo idioma
+        keyboard = [
+            [
+                InlineKeyboardButton("🇪🇸 Español", callback_data="lang_es"),
+                InlineKeyboardButton("🇺🇸 English", callback_data="lang_en")
+            ],
+            [InlineKeyboardButton(TEXTS[lang]['join_group'], url=config.GROUP_LINK)],
+            [InlineKeyboardButton(TEXTS[lang]['verify'], callback_data="verify_join")]
+        ]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            TEXTS[lang]['welcome'].format(name=query.from_user.first_name),
+            reply_markup=reply_markup
+        )
+        return WAITING_JOIN
+    
+    # Verificar unión al grupo
+    elif data == "verify_join":
+        # Aquí podrías verificar realmente con Telegram API
+        # Por ahora, asumimos que sí se unió
+        db.set_joined_group(user_id)
+        
+        lang = db.get_language(user_id)
+        await query.edit_message_text(
+            TEXTS[lang]['verified']
+        )
+        await show_main_menu_callback(query, context)
+        return ConversationHandler.END
+    
+    # Volver al menú principal
+    elif data == "back_to_menu":
+        await show_main_menu_callback(query, context)
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Muestra el menú principal (desde mensaje)"""
+    user_id = update.effective_user.id
+    balance = db.get_balance(user_id)
+    lang = db.get_language(user_id)
+    
+    keyboard = get_main_menu_keyboard(lang)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"{TEXTS[lang]['balance'].format(balance=balance)}\n\n{TEXTS[lang]['select_effect']}",
+        reply_markup=reply_markup
+    )
+
+async def show_main_menu_callback(query, context):
+    """Muestra el menú principal (desde callback)"""
+    user_id = query.from_user.id
+    balance = db.get_balance(user_id)
+    lang = db.get_language(user_id)
+    
+    keyboard = get_main_menu_keyboard(lang)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        f"{TEXTS[lang]['balance'].format(balance=balance)}\n\n{TEXTS[lang]['select_effect']}",
+        reply_markup=reply_markup
+    )
+
+def get_main_menu_keyboard(lang):
+    """Genera el teclado del menú principal"""
+    return [
+        [InlineKeyboardButton(TEXTS[lang]['effects']['avatar'], callback_data="effect_avatar")],
+        [InlineKeyboardButton(TEXTS[lang]['effects']['figura'], callback_data="effect_figura")],
+        [InlineKeyboardButton(TEXTS[lang]['effects']['dibujo'], callback_data="effect_dibujo")],
+        [InlineKeyboardButton(TEXTS[lang]['effects']['artistico'], callback_data="effect_artistico")],
+        [
+            InlineKeyboardButton(TEXTS[lang]['buy'], callback_data="buy_diamonds"),
+            InlineKeyboardButton(TEXTS[lang]['language'], callback_data="show_languages")
+        ]
+    ]
+
+async def show_languages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Muestra el selector de idiomas"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    balance = db.get_balance(user_id)
+    current_lang = db.get_language(user_id)
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("🇪🇸 Español", callback_data="change_lang_es"),
+            InlineKeyboardButton("🇺🇸 English", callback_data="change_lang_en")
+        ],
+        [InlineKeyboardButton("🔙 Volver / Back", callback_data="back_to_menu")]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    lang_text = "Selecciona tu idioma:" if current_lang == 'es' else "Select your language:"
+    
+    await query.edit_message_text(
+        f"💰 {balance} diamantes\n\n🌐 {lang_text}",
+        reply_markup=reply_markup
+    )
+
+async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cambia el idioma del usuario"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    lang = query.data.split("_")[2]
+    
+    db.set_language(user_id, lang)
+    await show_main_menu_callback(query, context)
