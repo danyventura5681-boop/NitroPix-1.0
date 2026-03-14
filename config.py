@@ -6,6 +6,9 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 TRX_ADDRESS = "TK2K6W7vFehHLB6eQ9CPPjcJ1E6ErCu12Y"
 
+# NUEVO: Link del grupo de Telegram
+GROUP_LINK = "https://t.me/+_46_k-WxFRZkYzcx"
+
 PLANS = {
     "20": {"usd": 5, "diamonds": 20},
     "50": {"usd": 10, "diamonds": 50},
