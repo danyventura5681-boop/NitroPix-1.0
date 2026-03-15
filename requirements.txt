@@ -1,6 +1,7 @@
 python-telegram-bot==20.7
 python-dotenv==1.0.0
-Pillow==9.5.0
+sqlalchemy==2.0.23
+pillow==9.5.0
 requests==2.31.0
-opencv-python-headless==4.8.1.78
+replicate==0.24.0
 aiofiles==23.2.1
