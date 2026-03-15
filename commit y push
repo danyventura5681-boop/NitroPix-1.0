@@ -1,3 +1,0 @@
-git add requirements.txt
-git commit -m "fix dependencies for render"
-git push
