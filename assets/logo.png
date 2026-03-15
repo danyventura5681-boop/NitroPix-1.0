@@ -1,0 +1,27 @@
+from PIL import Image, ImageDraw, ImageFont
+
+def add_watermark(image):
+
+    logo = Image.open("assets/logo.png").convert("RGBA")
+    logo = logo.resize((120,120))
+
+    image = image.convert("RGBA")
+
+    position = (
+        image.width - logo.width - 20,
+        image.height - logo.height - 20
+    )
+
+    image.paste(logo, position, logo)
+
+    draw = ImageDraw.Draw(image)
+
+    text = "NitroPix • Telegram Bot"
+
+    draw.text(
+        (20, image.height - 40),
+        text,
+        fill=(255,255,255,180)
+    )
+
+    return image.convert("RGB")
