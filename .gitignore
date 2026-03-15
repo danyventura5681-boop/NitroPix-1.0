@@ -16,4 +16,4 @@ env/
 *.swo
 
 # Logs
-*.log
+*.log.env
