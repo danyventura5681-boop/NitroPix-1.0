@@ -1,3 +1,0 @@
-git add .
-git commit -m "Fix Pillow build error"
-git push
