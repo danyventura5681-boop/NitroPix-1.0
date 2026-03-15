@@ -1,50 +1,64 @@
-import os
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from database import get_user, deduct_diamond
-from utils.effects_engine import apply_effect
-from utils.watermark import add_watermark
+from database import get_user
 
 
-async def process_effect(update: Update,
-                         context: ContextTypes.DEFAULT_TYPE,
-                         effect_name: str,
-                         cost: int):
+# ===============================
+# MENU DE EFECTOS NITROPIX
+# ===============================
+
+async def show_effects_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
-    db_user = get_user(user_id)
+    user = get_user(user_id)
 
-    if not db_user:
+    if not user:
         await update.message.reply_text("❌ Usuario no encontrado.")
         return
 
-    if db_user["diamonds"] < cost:
-        await update.message.reply_text("💎 Diamantes insuficientes.")
-        return
+    diamonds = user["diamonds"]
 
-    photo = update.message.photo[-1]
-    file = await photo.get_file()
+    text = f"""
+🎨 Elige un efecto mágico:
 
-    input_path = f"temp_{user_id}.jpg"
-    output_path = f"result_{user_id}.jpg"
+Tus 💎: {diamonds}
 
-    await file.download_to_drive(input_path)
+⚡ Powered by: NitroPix
+"""
 
-    # aplicar efecto
-    img = apply_effect(input_path, effect_name)
+    keyboard = [
 
-    # watermark
-    img = add_watermark(img)
+        [
+            InlineKeyboardButton("✨ Mejorar a HD - 1💎", callback_data="effect_hd"),
+            InlineKeyboardButton("✏️ Convertir en Dibujo - 1💎", callback_data="effect_drawing")
+        ],
 
-    img.save(output_path)
+        [
+            InlineKeyboardButton("📖 Convertir en Manga - 2💎", callback_data="effect_manga"),
+            InlineKeyboardButton("🎭 Crear Avatar - 2💎", callback_data="effect_avatar")
+        ],
 
-    deduct_diamond(user_id, cost)
+        [
+            InlineKeyboardButton("🦸 Figura de Acción - 2💎", callback_data="effect_action"),
+            InlineKeyboardButton("🎨 Diseño Artístico - 2💎", callback_data="effect_artistic")
+        ],
 
-    await update.message.reply_photo(
-        photo=open(output_path, "rb"),
-        caption="✨ Powered by: NitroPix"
+        [
+            InlineKeyboardButton(
+                "🚀 Invitar Amigos para Conseguir 💎",
+                callback_data="invite"
+            )
+        ],
+
+        [
+            InlineKeyboardButton("🏠 Panel Principal", callback_data="home")
+        ]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        text,
+        reply_markup=reply_markup
     )
-
-    os.remove(input_path)
-    os.remove(output_path)
