@@ -19,3 +19,4 @@ env/
 *.log.env
 .env
 .env
+.env
