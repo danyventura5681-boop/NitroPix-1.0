@@ -3,5 +3,3 @@ python-dotenv==1.0.0
 Pillow==10.0.1
 requests==2.31.0
 aiofiles==23.2.1
-runtime.txt
-python-3.11.9
