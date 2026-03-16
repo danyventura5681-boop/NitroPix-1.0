@@ -1,4 +1,4 @@
-0import logging
+import logging
 from telegram import Update, InputFile
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from io import BytesIO
