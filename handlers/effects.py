@@ -1,5 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
+from utils.file_store import save_image_from_url
 
 from services.ai_effects import (
     upscale_hd,
@@ -47,4 +48,7 @@ async def process_effect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Efecto no válido.")
         return
 
-    await update.message.reply_photo(result)
+    local_path = save_image_from_url(result)
+
+with open(local_path, "rb") as img:
+    await update.message.reply_photo(img)
