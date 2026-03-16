@@ -4,3 +4,4 @@ sqlalchemy==2.0.23
 requests==2.31.0
 replicate==0.25.1
 aiofiles==23.2.1
+aiohttp
