@@ -1,54 +1,58 @@
+import os
+import logging
+import replicate
+
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils.file_store import save_image_from_url
 
-from services.ai_effects import (
-    upscale_hd,
-    anime_style,
-    manga_style,
-    action_figure,
-    cinematic
-)
+logger = logging.getLogger(__name__)
 
-from utils.downloader import get_telegram_file_url
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+
+if not REPLICATE_API_TOKEN:
+    raise ValueError("REPLICATE_API_TOKEN no configurado")
+
+replicate_client = replicate.Client(api_token=REPLICATE_API_TOKEN)
 
 
-async def process_effect(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# =====================================
+# PROCESAR FOTO DEL USUARIO
+# =====================================
 
-    if not update.message.photo:
-        await update.message.reply_text("Envía una imagen primero.")
-        return
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Procesando imagen IA... 🚀")
+    try:
+        message = update.message
 
-    photo = update.message.photo[-1]
-    image_url = await get_telegram_file_url(
-        context.bot,
-        photo.file_id
-    )
+        await message.reply_text("⚡ Procesando imagen con IA...")
 
-    effect = context.user_data.get("effect")
+        # Obtener foto mayor resolución
+        photo = message.photo[-1]
+        file = await photo.get_file()
 
-    if effect == "hd":
-        result = upscale_hd(image_url)
+        input_path = "input.jpg"
+        await file.download_to_drive(input_path)
 
-    elif effect == "anime":
-        result = anime_style(image_url)
+        # ===== EJEMPLO EFECTO (UPSCALE GRATIS) =====
+        output = replicate_client.run(
+            "nightmareai/real-esrgan",
+            input={
+                "image": open(input_path, "rb"),
+                "scale": 2
+            }
+        )
 
-    elif effect == "manga":
-        result = manga_style(image_url)
+        image_url = output
 
-    elif effect == "figure":
-        result = action_figure(image_url)
+        # Enviar resultado
+        await message.reply_photo(photo=image_url)
 
-    elif effect == "cinematic":
-        result = cinematic(image_url)
+        # limpiar archivo local
+        if os.path.exists(input_path):
+            os.remove(input_path)
 
-    else:
-        await update.message.reply_text("Efecto no válido.")
-        return
-
-    local_path = save_image_from_url(result)
-
-with open(local_path, "rb") as img:
-    await update.message.reply_photo(img)
+    except Exception as e:
+        logger.error(f"Error procesando imagen: {e}")
+        await update.message.reply_text(
+            "❌ Ocurrió un error procesando la imagen."
+        )
