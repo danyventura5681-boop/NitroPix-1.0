@@ -13,6 +13,7 @@ logging.basicConfig(
 TOKEN = os.getenv("TOKEN")  # Asegúrate de ponerlo en .env
 
 # Función de start
+from storage.temp_manager import start_cleanup_worker
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "¡Bienvenido a NitroPix Lite!\n"
@@ -48,6 +49,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Main
 def main():
+start_cleanup_worker()
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
