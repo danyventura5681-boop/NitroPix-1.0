@@ -1,63 +1,94 @@
-import logging
-from telegram import Update, InputFile
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from io import BytesIO
 import os
+import logging
 
-# Config logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
 )
 
-TOKEN = os.getenv("TOKEN")  # Asegúrate de ponerlo en .env
-
-# Función de start
+from handlers.effects import handle_photo
 from storage.temp_manager import start_cleanup_worker
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+# ==============================
+# LOGGING
+# ==============================
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# ==============================
+# VARIABLES DE ENTORNO
+# ==============================
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN no encontrado en variables de entorno")
+
+
+# ==============================
+# COMANDOS
+# ==============================
+
+async def start(update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "¡Bienvenido a NitroPix Lite!\n"
-        "Envía una imagen y te aplicaremos un efecto exclusivo con nuestra marca de agua."
+        "🔥 Bienvenido a NitroPix Lite\n\n"
+        "Envía una foto y aplica efectos IA.\n"
+        "Imágenes eliminadas automáticamente en 48h."
     )
 
-# Función para aplicar efecto simple
-async def apply_effect(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.photo:
-        await update.message.reply_text("Por favor envía una imagen primero.")
-        return
 
-    photo_file = await update.message.photo[-1].get_file()
-    photo_bytes = BytesIO()
-    await photo_file.download(out=photo_bytes)
-    photo_bytes.seek(0)
-
-    # Aplicamos efecto simple: sólo agregamos marca de agua como texto
-    # Esto reemplaza Pillow
-    effect_image_bytes = BytesIO()
-    effect_image_bytes.write(photo_bytes.read())  # De momento, la imagen no se modifica
-    effect_image_bytes.seek(0)
-
-    # Enviamos de vuelta con "marca de agua" como caption
-    await update.message.reply_photo(
-        photo=InputFile(effect_image_bytes, filename="nitropix_lite.jpg"),
-        caption="NitroPix Lite 💎"
+async def help_command(update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📸 Cómo usar NitroPix:\n\n"
+        "1️⃣ Envía una foto\n"
+        "2️⃣ Elige un efecto\n"
+        "3️⃣ Recibe tu imagen IA\n\n"
+        "Efectos disponibles próximamente 🚀"
     )
 
-# Función de ayuda
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Envía una foto y nuestro bot aplicará un efecto exclusivo.")
 
-# Main
+# ==============================
+# MAIN APP
+# ==============================
+
 def main():
-start_cleanup_worker()
-    app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(MessageHandler(filters.PHOTO, apply_effect))
+    logger.info("Iniciando NitroPix Bot...")
 
-    print("Bot iniciado en modo polling")
-    app.run_polling()
+    # Crear aplicación Telegram
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    # -------- Handlers --------
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+
+    # Fotos enviadas por usuarios
+    application.add_handler(
+        MessageHandler(filters.PHOTO, handle_photo)
+    )
+
+    # -------- Cleanup Worker --------
+    # elimina imágenes >48h automáticamente
+    start_cleanup_worker()
+
+    # -------- Run Bot --------
+    logger.info("Bot iniciado correctamente ✅")
+    application.run_polling()
+
+
+# ==============================
+# ENTRYPOINT
+# ==============================
 
 if __name__ == "__main__":
     main()
