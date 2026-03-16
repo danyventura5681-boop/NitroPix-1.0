@@ -31,7 +31,12 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-if not BOT_TOKEN:
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+# Permitir import en GitHub Actions
+if not BOT_TOKEN and not os.getenv("GITHUB_ACTIONS"):
     raise ValueError("BOT_TOKEN no encontrado en variables de entorno")
 
 
