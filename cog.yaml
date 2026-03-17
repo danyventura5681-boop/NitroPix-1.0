@@ -1,7 +1,12 @@
 build:
   python_version: "3.10"
+
   python_packages:
-    - flask
-    - discord.py
+    - python-telegram-bot==20.7
+    - replicate
+    - python-dotenv
+    - Pillow
     - aiohttp
-predict: render_bot.py:Predictor
+    - flask
+
+predict: "render_bot.py:Predictor"
