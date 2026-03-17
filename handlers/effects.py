@@ -7,6 +7,11 @@ import requests
 
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 
+if not REPLICATE_API_TOKEN:
+    raise ValueError("REPLICATE_API_TOKEN no está configurado")
+
+replicate.api_token = REPLICATE_API_TOKEN
+
 TEMP_FOLDER = "temp"
 os.makedirs(TEMP_FOLDER, exist_ok=True)
 
