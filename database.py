@@ -163,3 +163,25 @@ class Database:
             return cursor.fetchall()
 
 db = Database()
+# ===== SISTEMA SIMPLE DE CRÉDITOS =====
+
+users_credits = {}
+
+
+def add_credits(user_id: int, amount: int):
+    users_credits[user_id] = users_credits.get(user_id, 0) + amount
+    return users_credits[user_id]
+
+
+def remove_credits(user_id: int, amount: int):
+    current = users_credits.get(user_id, 0)
+
+    if current < amount:
+        return False
+
+    users_credits[user_id] = current - amount
+    return True
+
+
+def get_credits(user_id: int):
+    return users_credits.get(user_id, 0)
