@@ -1,6 +1,11 @@
 services:
   - type: worker
-    name: NitroPix
+    name: nitropix
+    env: python
+    plan: free
+    buildCommand: chmod +x render-build.sh && ./render-build.sh
+    startCommand: python render_bot.py
+    runtime: python3.11
     runtime: python
     plan: free
     buildCommand: |
