@@ -10,8 +10,6 @@ REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 TEMP_FOLDER = "temp"
 os.makedirs(TEMP_FOLDER, exist_ok=True)
 
-REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
-
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = update.message
