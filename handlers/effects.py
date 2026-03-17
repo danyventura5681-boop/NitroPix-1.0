@@ -1,61 +1,57 @@
-# handlers/effects.py
-
 from telegram import Update
 from telegram.ext import ContextTypes
-from PIL import Image, ImageFilter
 import os
 import uuid
-
+import replicate
+import requests
 
 TEMP_FOLDER = "temp"
-
-
-# crear carpeta temporal si no existe
 os.makedirs(TEMP_FOLDER, exist_ok=True)
 
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Recibe una foto del usuario, aplica un efecto simple
-    y devuelve la imagen procesada.
-    """
 
     message = update.message
-
     if not message or not message.photo:
         return
 
-    # obtener la mejor calidad de la foto
     photo = message.photo[-1]
-
-    # descargar archivo desde Telegram
     file = await photo.get_file()
 
     input_path = os.path.join(TEMP_FOLDER, f"{uuid.uuid4()}.jpg")
-    output_path = os.path.join(TEMP_FOLDER, f"{uuid.uuid4()}_effect.jpg")
+    output_path = os.path.join(TEMP_FOLDER, f"{uuid.uuid4()}_ai.jpg")
 
     await file.download_to_drive(input_path)
 
-    # ---- PROCESAMIENTO CON PILLOW ----
+    await message.reply_text("🧠 Procesando con IA...")
+
     try:
-        image = Image.open(input_path)
+        os.environ["REPLICATE_API_TOKEN"] = REPLICATE_API_TOKEN
 
-        # ejemplo de efecto (BLUR)
-        image = image.filter(ImageFilter.BLUR)
+        # 🔥 Stable Diffusion (Replicate)
+        output = replicate.run(
+            "stability-ai/sdxl:39ed52f2a78e9345",
+            input={
+                "image": open(input_path, "rb"),
+                "prompt": "cinematic avatar portrait, ultra realistic, sharp focus",
+            },
+        )
 
-        image.save(output_path)
+        image_url = output[0]
+
+        # descargar resultado IA
+        img_data = requests.get(image_url).content
+        with open(output_path, "wb") as f:
+            f.write(img_data)
 
     except Exception as e:
-        await message.reply_text(f"❌ Error procesando imagen: {e}")
+        await message.reply_text(f"❌ Error IA: {e}")
         return
 
-    # enviar imagen procesada
-    try:
-        await message.reply_photo(photo=open(output_path, "rb"))
-    except Exception as e:
-        await message.reply_text(f"❌ Error enviando imagen: {e}")
+    await message.reply_photo(photo=open(output_path, "rb"))
 
-    # limpiar archivos temporales
+    # limpiar
     try:
         os.remove(input_path)
         os.remove(output_path)
