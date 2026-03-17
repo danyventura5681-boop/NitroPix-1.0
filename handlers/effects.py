@@ -127,4 +127,6 @@ def register_effects(application):
 
     application.add_handler(
         CommandHandler("effect", effect_command)
+from replicate_client import generate_image
     )
+
