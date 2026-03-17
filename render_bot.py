@@ -8,3 +8,13 @@ print(f"Iniciando NitroPix Lite en Render en puerto {PORT}")
 
 if __name__ == "__main__":
     main()
+from cog import BasePredictor
+
+class Predictor(BasePredictor):
+    def setup(self):
+        pass
+
+    def predict(self):
+        import subprocess
+        subprocess.Popen(["python", "bot.py"])
+        return "Bot started"
