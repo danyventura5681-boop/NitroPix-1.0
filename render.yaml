@@ -3,10 +3,13 @@ services:
     name: nitropix
     env: python
     plan: free
-    runtime: python3.11
 
     buildCommand: |
       chmod +x render-build.sh
       ./render-build.sh
 
     startCommand: python render_bot.py
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
