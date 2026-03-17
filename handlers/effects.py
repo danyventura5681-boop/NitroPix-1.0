@@ -1,7 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 import os
-import os
 
 os.environ["REPLICATE_API_TOKEN"] = os.getenv("REPLICATE_API_TOKEN")
 import uuid
