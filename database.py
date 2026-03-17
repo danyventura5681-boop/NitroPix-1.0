@@ -185,3 +185,8 @@ def remove_credits(user_id: int, amount: int):
 
 def get_credits(user_id: int):
     return users_credits.get(user_id, 0)
+def get_user(user_id: int):
+    return {
+        "user_id": user_id,
+        "credits": users_credits.get(user_id, 0)
+    }
