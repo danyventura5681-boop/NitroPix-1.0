@@ -1,11 +1,11 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 import os
-
-REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 import uuid
 import replicate
 import requests
+
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 
 TEMP_FOLDER = "temp"
 os.makedirs(TEMP_FOLDER, exist_ok=True)
