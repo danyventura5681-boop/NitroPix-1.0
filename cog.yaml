@@ -4,3 +4,4 @@ build:
     - flask
     - discord.py
     - aiohttp
+predict: render_bot.py:Predictor
