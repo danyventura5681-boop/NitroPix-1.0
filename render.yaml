@@ -3,14 +3,10 @@ services:
     name: nitropix
     env: python
     plan: free
-    buildCommand: chmod +x render-build.sh && ./render-build.sh
-    startCommand: python render_bot.py
     runtime: python3.11
-    runtime: python
-    plan: free
+
     buildCommand: |
-      apt-get update
-      apt-get install -y libjpeg-dev zlib1g-dev libfreetype6-dev libopenjp2-7-dev libtiff5-dev
-      pip install --upgrade pip
-      pip install -r requirements.txt
+      chmod +x render-build.sh
+      ./render-build.sh
+
     startCommand: python render_bot.py
