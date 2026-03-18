@@ -1,25 +1,11 @@
-from PIL import Image, ImageFilter, ImageEnhance
+import requests
 
 
-def apply_effect(image_path, effect):
+def download_image(url: str, output_path: str):
+    response = requests.get(url, timeout=30)
 
-    image = Image.open(image_path)
+    if response.status_code != 200:
+        raise Exception("Failed to download image")
 
-    if effect == "blur":
-        image = image.filter(ImageFilter.GaussianBlur(8))
-
-    elif effect == "sharpen":
-        image = image.filter(ImageFilter.SHARPEN)
-
-    elif effect == "bright":
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(1.6)
-
-    elif effect == "contrast":
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(1.7)
-
-    elif effect == "bw":
-        image = image.convert("L")
-
-    return image
+    with open(output_path, "wb") as f:
+        f.write(response.content)
