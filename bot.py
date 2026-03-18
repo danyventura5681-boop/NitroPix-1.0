@@ -16,6 +16,9 @@ from handlers.effects import handle_photo
 
 from storage.temp_manager import start_cleanup_worker
 
+# 🔥 KEEP ALIVE (IMPORTANTE PARA RENDER WEB SERVICE)
+from keep_alive import keep_alive
+
 
 # ==============================
 # LOGGING
@@ -62,6 +65,10 @@ def main():
 
     logger.info("Iniciando NitroPix Bot...")
 
+    # 🔥 Inicia servidor web para Render (PUERTO 8080)
+    keep_alive()
+
+    # Crear aplicación Telegram
     application = Application.builder().token(BOT_TOKEN).build()
 
     # ---------------- COMMANDS ----------------
@@ -69,12 +76,12 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
 
     # ---------------- BUTTONS ----------------
-    # Selector de efectos (PRIMERO — más específico)
+    # Selector de efectos (más específico primero)
     application.add_handler(
         CallbackQueryHandler(effect_selector, pattern="^effect_")
     )
 
-    # Otros botones del menú
+    # Otros botones
     application.add_handler(
         CallbackQueryHandler(button_handler)
     )
