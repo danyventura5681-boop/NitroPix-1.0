@@ -28,5 +28,61 @@ jobs:
       - name: Instalar requirements
         run: pip install -r requirements.txt
 
-      - name: Test import bot
-        run: python -c "import render_bot"
+      - name: Verificar variables de entorno
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          echo "🔍 Verificando configuración..."
+          python -c "
+import os
+import sys
+
+# Verificar tokens (sin mostrar valores reales)
+replicate_token = os.environ.get('REPLICATE_API_TOKEN')
+bot_token = os.environ.get('BOT_TOKEN')
+
+print(f'REPLICATE_API_TOKEN: {\"✅ Configurado\" if replicate_token else \"⚠️ No configurado (modo simulación)\"}')
+print(f'BOT_TOKEN: {\"✅ Configurado\" if bot_token else \"⚠️ No configurado (modo simulación)\"}')
+
+# No fallamos si no hay tokens - los tests deben continuar
+print('✅ Verificación completada')
+"
+
+      - name: Test import bot (con variables seguras)
+        env:
+          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          echo "🧪 Probando imports..."
+          python -c "
+import os
+import sys
+
+# Configurar entorno para tests
+if not os.environ.get('REPLICATE_API_TOKEN'):
+    print('⚠️ REPLICATE_API_TOKEN no disponible - usando modo simulación')
+    os.environ['REPLICATE_API_TOKEN'] = 'test_token_simulado'
+
+if not os.environ.get('BOT_TOKEN'):
+    print('⚠️ BOT_TOKEN no disponible - usando modo simulación')
+    os.environ['BOT_TOKEN'] = 'test_token_simulado'
+
+# Probar imports principales
+try:
+    import config
+    print('✅ config.py importado')
+    
+    import replicate_client
+    print('✅ replicate_client.py importado')
+    
+    from handlers import start, effects, daily, referral, recharge
+    print('✅ handlers importados')
+    
+    import render_bot
+    print('✅ render_bot.py importado - ¡TODO OK!')
+    
+except Exception as e:
+    print(f'❌ Error en import: {e}')
+    sys.exit(1)
+"
