@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,7 +20,7 @@ jobs:
       - name: Actualizar pip
         run: python -m pip install --upgrade pip
 
-      - name: Instalar dependencias del sistema
+      - name: Instalar dependencias del sistema (Pillow fix)
         run: |
           sudo apt-get update
           sudo apt-get install -y libjpeg-dev zlib1g-dev libfreetype6-dev libopenjp2-7-dev libtiff5-dev
@@ -28,25 +28,5 @@ jobs:
       - name: Instalar requirements
         run: pip install -r requirements.txt
 
-      - name: Test import basico
-        run: |
-          python -c "
-import sys
-print('✅ Python funcionando')
-print(f'Versión: {sys.version}')
-"
-
-      - name: Test config
-        env:
-          REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        run: |
-          python -c "
-import os
-print('✅ Variables de entorno accesibles')
-print(f'REPLICATE_API_TOKEN: {\"Configurado\" if os.environ.get(\"REPLICATE_API_TOKEN\") else \"No configurado\"}')
-print(f'BOT_TOKEN: {\"Configurado\" if os.environ.get(\"BOT_TOKEN\") else \"No configurado\"}')
-"
-
-      - name: Test render_bot
+      - name: Test import bot
         run: python -c "import render_bot"
