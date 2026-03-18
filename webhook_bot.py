@@ -20,7 +20,10 @@ if not TOKEN:
     raise ValueError("❌ No BOT_TOKEN found in environment variables")
 
 PORT = int(os.environ.get("PORT", 8000))
-URL = os.environ.get("RENDER_EXTERNAL_URL", f"https://localhost:{PORT}")
+URL = os.environ.get("RENDER_EXTERNAL_URL")
+
+if not URL:
+    raise ValueError("❌ RENDER_EXTERNAL_URL no definida")
 
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{URL}{WEBHOOK_PATH}"
@@ -46,7 +49,7 @@ telegram_app = Application.builder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✅ NitroPix funcionando con webhooks!"
+        "✅ NitroPix funcionando correctamente en Render 🚀"
     )
 
 
@@ -62,37 +65,48 @@ async def telegram_webhook(request):
         data = await request.json()
 
         update = Update.de_json(data, telegram_app.bot)
-        await telegram_app.update_queue.put(update)
+
+        # 🔥 enviar update al dispatcher ACTIVO
+        await telegram_app.process_update(update)
 
         return Response("ok", status_code=200)
 
     except Exception as e:
-        logger.error(f"❌ Error en webhook: {e}")
+        logger.exception("❌ Error en webhook")
         return Response("error", status_code=500)
 
 
 # ==============================
-# HEALTH CHECK (RENDER + UPTIMEROBOT)
+# HEALTH CHECK
 # ==============================
 
 async def health_check(request):
-    return PlainTextResponse("OK")
+    return PlainTextResponse("OK", status_code=200)
 
 
 # ==============================
-# SETUP WEBHOOK ON STARTUP
+# STARTUP / SHUTDOWN
 # ==============================
 
-async def setup_webhook():
+async def startup():
+    logger.info("🚀 Inicializando bot...")
+
     await telegram_app.initialize()
+    await telegram_app.start()   # ⭐ ESTA ERA LA PIEZA FALTANTE
 
     await telegram_app.bot.set_webhook(
         url=WEBHOOK_URL,
         drop_pending_updates=True,
     )
 
-    logger.info(f"✅ Webhook configurado en: {WEBHOOK_URL}")
+    logger.info(f"✅ Webhook configurado: {WEBHOOK_URL}")
     logger.info("✅ Bot listo para recibir mensajes")
+
+
+async def shutdown():
+    logger.info("🛑 Cerrando bot...")
+    await telegram_app.stop()
+    await telegram_app.shutdown()
 
 
 # ==============================
@@ -102,11 +116,12 @@ async def setup_webhook():
 app = Starlette(
     routes=[
         Route(WEBHOOK_PATH, telegram_webhook, methods=["POST"]),
-        Route("/health", health_check, methods=["GET"]),      # ✅ UptimeRobot
-        Route("/healthcheck", health_check, methods=["GET"]), # ✅ Compatibilidad
-        Route("/", health_check, methods=["GET"]),            # ✅ Root alive
+        Route("/health", health_check, methods=["GET"]),
+        Route("/healthcheck", health_check, methods=["GET"]),
+        Route("/", health_check, methods=["GET"]),
     ],
-    on_startup=[setup_webhook],
+    on_startup=[startup],
+    on_shutdown=[shutdown],
 )
 
 
@@ -115,5 +130,5 @@ app = Starlette(
 # ==============================
 
 if __name__ == "__main__":
-    logger.info(f"🚀 Iniciando servidor en puerto {PORT}")
+    logger.info(f"🌐 Servidor iniciado en puerto {PORT}")
     uvicorn.run(app, host="0.0.0.0", port=PORT)
