@@ -1,18 +1,21 @@
 import sqlite3
-import json
-from datetime import datetime
+
+
+# ==================================
+# DATABASE CLASS
+# ==================================
 
 class Database:
-    def __init__(self, db_path='database.db'):
+    def __init__(self, db_path="database.db"):
         self.db_path = db_path
         self.init_db()
-    
+
     def init_db(self):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            
-            # Tabla de usuarios
-            cursor.execute('''
+
+            # USERS
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
                     username TEXT,
@@ -23,170 +26,168 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_active TIMESTAMP
                 )
-            ''')
-            
-            # Tabla de transacciones
-            cursor.execute('''
+            """)
+
+            # TRANSACTIONS
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS transactions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
                     amount REAL,
                     effect TEXT,
                     status TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
-            
-            # Tabla de imágenes generadas
-            cursor.execute('''
+            """)
+
+            # GENERATED IMAGES
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS generated_images (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
                     effect TEXT,
                     image_path TEXT,
                     prompt TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
-            
+            """)
+
             conn.commit()
-    
-    # ====== MÉTODOS DE USUARIO ======
-    
+
+    # ================= USERS =================
+
     def get_user(self, user_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+            cursor.execute(
+                "SELECT * FROM users WHERE user_id = ?", (user_id,)
+            )
             return cursor.fetchone()
-    
+
     def create_user(self, user_id, username, first_name):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT OR IGNORE INTO users (user_id, username, first_name, balance, joined_group)
+            cursor.execute("""
+                INSERT OR IGNORE INTO users
+                (user_id, username, first_name, balance, joined_group)
                 VALUES (?, ?, ?, 3.5, 0)
-            ''', (user_id, username, first_name))
+            """, (user_id, username, first_name))
             conn.commit()
-    
+
     def update_last_active(self, user_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE users SET last_active = CURRENT_TIMESTAMP
+            cursor.execute("""
+                UPDATE users
+                SET last_active = CURRENT_TIMESTAMP
                 WHERE user_id = ?
-            ''', (user_id,))
+            """, (user_id,))
             conn.commit()
-    
-    # ====== MÉTODOS DE SALDO ======
-    
+
+    # ================= BALANCE =================
+
     def get_balance(self, user_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT balance FROM users WHERE user_id = ?', (user_id,))
+            cursor.execute(
+                "SELECT balance FROM users WHERE user_id = ?", (user_id,)
+            )
             result = cursor.fetchone()
             return result[0] if result else 0
-    
+
     def update_balance(self, user_id, amount):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE users SET balance = balance + ? WHERE user_id = ?
-            ''', (amount, user_id))
-            conn.commit()
-            
-            # Registrar transacción
-            cursor.execute('''
+
+            cursor.execute("""
+                UPDATE users
+                SET balance = balance + ?
+                WHERE user_id = ?
+            """, (amount, user_id))
+
+            cursor.execute("""
                 INSERT INTO transactions (user_id, amount, status)
                 VALUES (?, ?, ?)
-            ''', (user_id, amount, 'completed' if amount < 0 else 'purchase'))
+            """, (
+                user_id,
+                amount,
+                "completed" if amount < 0 else "purchase"
+            ))
+
             conn.commit()
-            
+
             return self.get_balance(user_id)
-    
-    # ====== MÉTODOS DE GRUPO ======
-    
+
+    # ================= GROUP =================
+
     def set_joined_group(self, user_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE users SET joined_group = 1 WHERE user_id = ?
-            ''', (user_id,))
+            cursor.execute(
+                "UPDATE users SET joined_group = 1 WHERE user_id = ?",
+                (user_id,)
+            )
             conn.commit()
-    
+
     def has_joined_group(self, user_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT joined_group FROM users WHERE user_id = ?', (user_id,))
+            cursor.execute(
+                "SELECT joined_group FROM users WHERE user_id = ?",
+                (user_id,)
+            )
             result = cursor.fetchone()
             return result[0] if result else 0
-    
-    # ====== MÉTODOS DE IDIOMA ======
-    
+
+    # ================= LANGUAGE =================
+
     def set_language(self, user_id, language):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE users SET language = ? WHERE user_id = ?
-            ''', (language, user_id))
+            cursor.execute(
+                "UPDATE users SET language = ? WHERE user_id = ?",
+                (language, user_id)
+            )
             conn.commit()
-    
+
     def get_language(self, user_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT language FROM users WHERE user_id = ?', (user_id,))
+            cursor.execute(
+                "SELECT language FROM users WHERE user_id = ?",
+                (user_id,)
+            )
             result = cursor.fetchone()
-            return result[0] if result else 'es'
-    
-    # ====== MÉTODOS DE IMÁGENES ======
-    
+            return result[0] if result else "es"
+
+    # ================= IMAGES =================
+
     def save_generated_image(self, user_id, effect, image_path, prompt=None):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO generated_images (user_id, effect, image_path, prompt)
+            cursor.execute("""
+                INSERT INTO generated_images
+                (user_id, effect, image_path, prompt)
                 VALUES (?, ?, ?, ?)
-            ''', (user_id, effect, image_path, prompt))
+            """, (user_id, effect, image_path, prompt))
             conn.commit()
             return cursor.lastrowid
-    
+
     def get_user_images(self, user_id, limit=10):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT * FROM generated_images 
-                WHERE user_id = ? 
-                ORDER BY created_at DESC 
+            cursor.execute("""
+                SELECT *
+                FROM generated_images
+                WHERE user_id = ?
+                ORDER BY created_at DESC
                 LIMIT ?
-            ''', (user_id, limit))
+            """, (user_id, limit))
             return cursor.fetchall()
 
+
+# ==================================
+# GLOBAL INSTANCE (IMPORTABLE)
+# ==================================
+
 db = Database()
-# ===== SISTEMA SIMPLE DE CRÉDITOS =====
-
-users_credits = {}
-
-
-def add_credits(user_id: int, amount: int):
-    users_credits[user_id] = users_credits.get(user_id, 0) + amount
-    return users_credits[user_id]
-
-
-def remove_credits(user_id: int, amount: int):
-    current = users_credits.get(user_id, 0)
-
-    if current < amount:
-        return False
-
-    users_credits[user_id] = current - amount
-    return True
-
-
-def get_credits(user_id: int):
-    return users_credits.get(user_id, 0)
-def get_user(user_id: int):
-    return {
-        "user_id": user_id,
-        "credits": users_credits.get(user_id, 0)
-    }
