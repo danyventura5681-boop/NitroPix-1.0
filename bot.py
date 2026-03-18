@@ -5,11 +5,15 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
 
+# Handlers
+from handlers.start import start, button_handler, effect_selector
 from handlers.effects import handle_photo
+
 from storage.temp_manager import start_cleanup_worker
 
 
@@ -31,34 +35,22 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-import os
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# Permitir import en GitHub Actions
+# Permitir tests en GitHub Actions
 if not BOT_TOKEN and not os.getenv("GITHUB_ACTIONS"):
     raise ValueError("BOT_TOKEN no encontrado en variables de entorno")
 
 
 # ==============================
-# COMANDOS
+# HELP COMMAND
 # ==============================
-
-async def start(update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🔥 Bienvenido a NitroPix Lite\n\n"
-        "Envía una foto y aplica efectos IA.\n"
-        "Imágenes eliminadas automáticamente en 48h."
-    )
-
 
 async def help_command(update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📸 Cómo usar NitroPix:\n\n"
-        "1️⃣ Envía una foto\n"
-        "2️⃣ Elige un efecto\n"
-        "3️⃣ Recibe tu imagen IA\n\n"
-        "Efectos disponibles próximamente 🚀"
+        "1️⃣ Usa /start\n"
+        "2️⃣ Selecciona un efecto\n"
+        "3️⃣ Envía una foto\n"
+        "4️⃣ Recibe tu imagen IA 🚀"
     )
 
 
@@ -70,23 +62,32 @@ def main():
 
     logger.info("Iniciando NitroPix Bot...")
 
-    # Crear aplicación Telegram
     application = Application.builder().token(BOT_TOKEN).build()
 
-    # -------- Handlers --------
+    # ---------------- COMMANDS ----------------
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
 
-    # Fotos enviadas por usuarios
+    # ---------------- BUTTONS ----------------
+    # Selector de efectos (PRIMERO — más específico)
+    application.add_handler(
+        CallbackQueryHandler(effect_selector, pattern="^effect_")
+    )
+
+    # Otros botones del menú
+    application.add_handler(
+        CallbackQueryHandler(button_handler)
+    )
+
+    # ---------------- PHOTO HANDLER ----------------
     application.add_handler(
         MessageHandler(filters.PHOTO, handle_photo)
     )
 
-    # -------- Cleanup Worker --------
-    # elimina imágenes >48h automáticamente
+    # ---------------- CLEANUP WORKER ----------------
     start_cleanup_worker()
 
-    # -------- Run Bot --------
+    # ---------------- RUN BOT ----------------
     logger.info("Bot iniciado correctamente ✅")
     application.run_polling()
 
