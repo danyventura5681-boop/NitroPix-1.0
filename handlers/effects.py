@@ -1,8 +1,11 @@
+import os
+import tempfile
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from database import add_credits, remove_credits, get_user
-from replicate_client import generate_image
+from services.ai_effects import cinematic  # efecto inicial
 
 
 # =====================================
@@ -10,57 +13,77 @@ from replicate_client import generate_image
 # =====================================
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Recibe una foto del usuario,
-    verifica créditos y genera imagen usando Replicate.
-    """
 
     user_id = update.effective_user.id
 
-    # Obtener usuario
+    # ===============================
+    # USER CHECK
+    # ===============================
+
     user = get_user(user_id)
 
-    # Si no existe, crear usuario con créditos iniciales
     if not user:
         add_credits(user_id, 5)
         user = get_user(user_id)
 
     credits = user["credits"]
 
-    # Verificar créditos
     if credits <= 0:
         await update.message.reply_text(
             "❌ No tienes créditos suficientes."
         )
         return
 
-    await update.message.reply_text("🎨 Generando imagen...")
+    await update.message.reply_text("🎨 Procesando imagen...")
+
+    tmp_file = None
 
     try:
-        # Obtener la foto en mejor calidad
+        # ===============================
+        # DOWNLOAD TELEGRAM IMAGE
+        # ===============================
+
         photo = update.message.photo[-1]
         file = await photo.get_file()
 
-        # Descargar archivo temporal
-        file_path = f"/tmp/{user_id}.jpg"
-        await file.download_to_drive(file_path)
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        tmp_file = tmp.name
 
-        # Generar imagen con Replicate
-        result_url = generate_image(file_path)
+        await file.download_to_drive(tmp_file)
 
-        # Restar crédito
+        # ===============================
+        # APPLY AI EFFECT
+        # ===============================
+
+        # Convertimos path local → URL file compatible
+        # ai_effects trabaja con URLs, así que usamos file://
+        image_url = f"file://{tmp_file}"
+
+        result_url = cinematic(image_url)
+
+        # ===============================
+        # REMOVE CREDIT SOLO SI FUNCIONÓ
+        # ===============================
+
         remove_credits(user_id, 1)
 
-        # Enviar resultado
+        # ===============================
+        # SEND RESULT
+        # ===============================
+
         await update.message.reply_photo(
             photo=result_url,
             caption="✅ Imagen generada"
         )
 
     except Exception as e:
-        print("ERROR:", e)
+        print("ERROR effects handler:", e)
 
         await update.message.reply_text(
-            "⚠️ Ocurrió un error al procesar la imagen."
+            "⚠️ Error procesando la imagen. Intenta nuevamente."
         )
+
+    finally:
+        if tmp_file and os.path.exists(tmp_file):
+            os.remove(tmp_file)
 
