@@ -1,37 +1,24 @@
-from telegram.ext import Application
+from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-# importar módulos
-from . import start
-from . import effects
-from . import admin
-from . import daily
-from . import referral
-from . import recharge
-from . import process
+from handlers.start import start
+from handlers.effects import handle_photo
+from handlers.router import callback_router
 
 
-def register_handlers(app: Application):
-    """
-    Registra TODOS los handlers del bot
-    """
+def register_handlers(app):
+    """Registra todos los handlers del bot"""
 
-    # START
-    app.add_handler(start.get_handlers())
+    # =========================
+    # COMMANDS
+    # =========================
+    app.add_handler(CommandHandler("start", start))
 
-    # EFFECTS
-    app.add_handler(effects.get_handlers())
+    # =========================
+    # CALLBACK BUTTONS (ROUTER)
+    # =========================
+    app.add_handler(CallbackQueryHandler(callback_router))
 
-    # ADMIN
-    app.add_handler(admin.get_handlers())
-
-    # DAILY
-    app.add_handler(daily.get_handlers())
-
-    # REFERRAL
-    app.add_handler(referral.get_handlers())
-
-    # RECHARGE
-    app.add_handler(recharge.get_handlers())
-
-    # PROCESS (photos / IA)
-    app.add_handler(process.get_handlers())
+    # =========================
+    # PHOTO HANDLER
+    # =========================
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
