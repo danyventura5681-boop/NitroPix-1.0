@@ -104,3 +104,27 @@ def remove_credits(user_id: int, amount: int):
 def get_credits(user_id: int) -> int:
     user = get_user(user_id)
     return user["credits"]
+# ==============================
+# DEDUCT DIAMOND (FIX RENDER)
+# ==============================
+
+def deduct_diamond(user_id: int, amount: int = 1):
+    """
+    Resta diamantes/créditos al usuario
+    """
+
+    user = get_user(user_id)
+
+    if not user:
+        return False
+
+    credits = user.get("credits", 0)
+
+    if credits < amount:
+        return False
+
+    user["credits"] = credits - amount
+
+    save_user(user_id, user)
+
+    return True
