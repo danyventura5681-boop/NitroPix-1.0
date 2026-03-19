@@ -67,6 +67,9 @@ def get_user(user_id: int):
 
     conn.close()
     return user
+def save_user(user_id, data):
+    db[str(user_id)] = data
+    save_db()
 
 
 # ==============================
@@ -128,3 +131,34 @@ def deduct_diamond(user_id: int, amount: int = 1):
     save_user(user_id, user)
 
     return True
+# =====================================================
+# DAILY REWARD HELPERS
+# =====================================================
+
+from datetime import datetime, timedelta
+
+
+def can_claim_daily(user_id: int) -> bool:
+    user = get_user(user_id)
+
+    if not user:
+        return False
+
+    last_claim = user.get("last_daily")
+
+    if not last_claim:
+        return True
+
+    last_claim_date = datetime.fromisoformat(last_claim)
+
+    return datetime.utcnow() - last_claim_date >= timedelta(hours=24)
+
+
+def set_daily_claimed(user_id: int):
+    user = get_user(user_id)
+
+    if not user:
+        return
+
+    user["last_daily"] = datetime.utcnow().isoformat()
+    save_user(user_id, user)
