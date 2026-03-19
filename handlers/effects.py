@@ -1,11 +1,19 @@
 import os
 import tempfile
+import asyncio
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from database import add_credits, remove_credits, get_user
-from services.ai_effects import cinematic  # efecto inicial
+from services.ai_effects import cinematic
+
+
+# =====================================
+# USERS EN PROCESO (ANTI SPAM / DUPLICADO)
+# =====================================
+
+processing_users = set()
 
 
 # =====================================
@@ -16,29 +24,41 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    # ===============================
-    # USER CHECK
-    # ===============================
+    # -------------------------------
+    # EVITAR DOBLE PROCESAMIENTO
+    # -------------------------------
 
-    user = get_user(user_id)
-
-    if not user:
-        add_credits(user_id, 5)
-        user = get_user(user_id)
-
-    credits = user["credits"]
-
-    if credits <= 0:
+    if user_id in processing_users:
         await update.message.reply_text(
-            "❌ No tienes créditos suficientes."
+            "⏳ Ya estoy procesando una imagen tuya..."
         )
         return
 
-    await update.message.reply_text("🎨 Procesando imagen...")
+    processing_users.add(user_id)
 
     tmp_file = None
 
     try:
+        # ===============================
+        # USER CHECK
+        # ===============================
+
+        user = get_user(user_id)
+
+        if not user:
+            add_credits(user_id, 5)
+            user = get_user(user_id)
+
+        credits = user["credits"]
+
+        if credits <= 0:
+            await update.message.reply_text(
+                "❌ No tienes créditos suficientes."
+            )
+            return
+
+        await update.message.reply_text("🎨 Procesando imagen...")
+
         # ===============================
         # DOWNLOAD TELEGRAM IMAGE
         # ===============================
@@ -52,14 +72,16 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await file.download_to_drive(tmp_file)
 
         # ===============================
-        # APPLY AI EFFECT
+        # APPLY AI EFFECT (NO BLOQUEANTE)
         # ===============================
 
-        # Convertimos path local → URL file compatible
-        # ai_effects trabaja con URLs, así que usamos file://
         image_url = f"file://{tmp_file}"
 
-        result_url = cinematic(image_url)
+        # Ejecutar IA fuera del event loop
+        result_url = await asyncio.to_thread(
+            cinematic,
+            image_url
+        )
 
         # ===============================
         # REMOVE CREDIT SOLO SI FUNCIONÓ
@@ -73,7 +95,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_photo(
             photo=result_url,
-            caption="✅ Imagen generada"
+            caption="✅ Imagen generada (-1 crédito)"
         )
 
     except Exception as e:
@@ -84,6 +106,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     finally:
+        # limpiar archivo temporal
         if tmp_file and os.path.exists(tmp_file):
             os.remove(tmp_file)
+
+        # liberar usuario
+        processing_users.discard(user_id)
 
