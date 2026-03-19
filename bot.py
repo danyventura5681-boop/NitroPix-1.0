@@ -65,7 +65,7 @@ def main():
 
     logger.info("Iniciando NitroPix Bot...")
 
-    # 🔥 Inicia servidor web para Render (PUERTO 8080)
+    # 🔥 Servidor web para Render (evita sleep)
     keep_alive()
 
     # Crear aplicación Telegram
@@ -76,7 +76,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
 
     # ---------------- BUTTONS ----------------
-    # Selector de efectos (más específico primero)
+    # Selector específico primero
     application.add_handler(
         CallbackQueryHandler(effect_selector, pattern="^effect_")
     )
@@ -96,7 +96,12 @@ def main():
 
     # ---------------- RUN BOT ----------------
     logger.info("Bot iniciado correctamente ✅")
-    application.run_polling()
+
+    # 🔥 POLLING SEGURO PARA RENDER (ANTI DOBLE INSTANCIA)
+    application.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message", "callback_query"],
+    )
 
 
 # ==============================
