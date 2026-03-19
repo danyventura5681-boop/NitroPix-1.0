@@ -2,7 +2,7 @@ import os
 import logging
 
 from starlette.applications import Starlette
-from starlette.responses import Response, PlainTextResponse, JSONResponse
+from starlette.responses import PlainTextResponse, JSONResponse
 from starlette.routing import Route
 
 import uvicorn
@@ -20,8 +20,9 @@ from telegram.ext import (
 # IMPORTAR HANDLERS
 # ==============================
 
-from handlers.start import start, button_handler, effect_selector
+from handlers.start import start, effect_selector
 from handlers.effects import handle_photo
+from handlers.router import callback_router
 
 
 # ==============================
@@ -55,19 +56,32 @@ logger = logging.getLogger("nitropix")
 
 telegram_app = Application.builder().token(TOKEN).build()
 
-# COMMAND
+# ==============================
+# COMMANDS
+# ==============================
+
 telegram_app.add_handler(CommandHandler("start", start))
 
-# BUTTONS
+# ==============================
+# EFFECT SELECTOR (NO TOCAR)
+# ==============================
+
 telegram_app.add_handler(
     CallbackQueryHandler(effect_selector, pattern="^effect_")
 )
 
+# ==============================
+# ROUTER CENTRAL (🔥 NUEVO)
+# ==============================
+
 telegram_app.add_handler(
-    CallbackQueryHandler(button_handler)
+    CallbackQueryHandler(callback_router)
 )
 
+# ==============================
 # PHOTO HANDLER
+# ==============================
+
 telegram_app.add_handler(
     MessageHandler(filters.PHOTO, handle_photo)
 )
@@ -83,7 +97,6 @@ async def telegram_webhook(request):
 
         update = Update.de_json(data, telegram_app.bot)
 
-        # Enviar update al bot
         await telegram_app.update_queue.put(update)
 
         return JSONResponse({"status": "ok"})
@@ -102,21 +115,19 @@ async def health(request):
 
 
 # ==============================
-# STARTUP (🔥 CLAVE)
+# STARTUP
 # ==============================
 
 async def startup():
 
     logger.info("🚀 Starting NitroPix...")
 
-    # Inicializar Telegram
     await telegram_app.initialize()
 
-    # Evitar doble ejecución en Render
+    # Evitar doble instancia en Render
     if not telegram_app.running:
         await telegram_app.start()
 
-    # Activar webhook
     await telegram_app.bot.set_webhook(
         url=WEBHOOK_URL,
         drop_pending_updates=True,
@@ -131,6 +142,7 @@ async def startup():
 # ==============================
 
 async def shutdown():
+
     logger.info("🛑 Shutting down NitroPix...")
 
     if telegram_app.running:
