@@ -83,4 +83,9 @@ async def effect_selector(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         "🚧 Los efectos estarán disponibles pronto."
+from telegram.ext import CommandHandler, CallbackQueryHandler
+
+
+def get_handlers():
+    return CommandHandler("start", start)
     )
