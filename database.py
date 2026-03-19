@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from datetime import datetime, timedelta
 
 DB_PATH = Path("nitropix.db")
 
@@ -25,7 +26,9 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
-            credits INTEGER DEFAULT 5
+            credits INTEGER DEFAULT 5,
+            language TEXT DEFAULT 'en',
+            last_daily TEXT
         )
     """)
 
@@ -33,8 +36,17 @@ def init_db():
     conn.close()
 
 
-# Ejecutar al importar
 init_db()
+
+
+# ==============================
+# HELPERS
+# ==============================
+
+def row_to_dict(row):
+    if row is None:
+        return None
+    return dict(row)
 
 
 # ==============================
@@ -54,8 +66,8 @@ def get_user(user_id: int):
 
     if not user:
         cursor.execute(
-            "INSERT INTO users (user_id, credits) VALUES (?, ?)",
-            (user_id, 5)
+            "INSERT INTO users (user_id) VALUES (?)",
+            (user_id,)
         )
         conn.commit()
 
@@ -66,10 +78,7 @@ def get_user(user_id: int):
         user = cursor.fetchone()
 
     conn.close()
-    return user
-def save_user(user_id, data):
-    db[str(user_id)] = data
-    save_db()
+    return row_to_dict(user)
 
 
 # ==============================
@@ -90,7 +99,16 @@ def add_credits(user_id: int, amount: int):
     conn.close()
 
 
-def remove_credits(user_id: int, amount: int):
+def deduct_diamond(user_id: int, amount: int = 1):
+
+    user = get_user(user_id)
+
+    if not user:
+        return False
+
+    if user["credits"] < amount:
+        return False
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -103,62 +121,59 @@ def remove_credits(user_id: int, amount: int):
     conn.commit()
     conn.close()
 
+    return True
+
 
 def get_credits(user_id: int) -> int:
     user = get_user(user_id)
     return user["credits"]
+
+
 # ==============================
-# DEDUCT DIAMOND (FIX RENDER)
+# LANGUAGE
 # ==============================
 
-def deduct_diamond(user_id: int, amount: int = 1):
-    """
-    Resta diamantes/créditos al usuario
-    """
+def set_language(user_id: int, lang: str):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    user = get_user(user_id)
+    cursor.execute("""
+        UPDATE users
+        SET language = ?
+        WHERE user_id = ?
+    """, (lang, user_id))
 
-    if not user:
-        return False
+    conn.commit()
+    conn.close()
 
-    credits = user.get("credits", 0)
 
-    if credits < amount:
-        return False
-
-    user["credits"] = credits - amount
-
-    save_user(user_id, user)
-
-    return True
-# =====================================================
-# DAILY REWARD HELPERS
-# =====================================================
-
-from datetime import datetime, timedelta
-
+# ==============================
+# DAILY REWARD
+# ==============================
 
 def can_claim_daily(user_id: int) -> bool:
+
     user = get_user(user_id)
-
-    if not user:
-        return False
-
-    last_claim = user.get("last_daily")
+    last_claim = user["last_daily"]
 
     if not last_claim:
         return True
 
-    last_claim_date = datetime.fromisoformat(last_claim)
+    last_date = datetime.fromisoformat(last_claim)
 
-    return datetime.utcnow() - last_claim_date >= timedelta(hours=24)
+    return datetime.utcnow() - last_date >= timedelta(hours=24)
 
 
 def set_daily_claimed(user_id: int):
-    user = get_user(user_id)
 
-    if not user:
-        return
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    user["last_daily"] = datetime.utcnow().isoformat()
-    save_user(user_id, user)
+    cursor.execute("""
+        UPDATE users
+        SET last_daily = ?
+        WHERE user_id = ?
+    """, (datetime.utcnow().isoformat(), user_id))
+
+    conn.commit()
+    conn.close()
