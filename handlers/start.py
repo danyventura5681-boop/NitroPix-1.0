@@ -12,27 +12,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
 
-    # ✅ Crear usuario automáticamente (si no existe)
+    # Crear usuario automáticamente
     db.get_user(user.id)
 
     credits = db.get_credits(user.id)
 
     keyboard = [
-        [
-            InlineKeyboardButton("🎨 Efectos", callback_data="menu_effects"),
-        ],
-        [
-            InlineKeyboardButton("💳 Créditos", callback_data="menu_credits"),
-        ],
+        [InlineKeyboardButton("🎨 Efectos", callback_data="menu_effects")],
+        [InlineKeyboardButton("💳 Créditos", callback_data="menu_credits")],
     ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
         f"🔥 Bienvenido a NitroPix Lite\n\n"
         f"✨ Créditos disponibles: {credits}\n\n"
         "Envía una foto y aplica efectos IA.",
-        reply_markup=reply_markup,
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
@@ -83,9 +77,4 @@ async def effect_selector(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         "🚧 Los efectos estarán disponibles pronto."
-from telegram.ext import CommandHandler, CallbackQueryHandler
-
-
-def get_handlers():
-    return CommandHandler("start", start)
     )
