@@ -30,29 +30,35 @@ from handlers.effects import handle_photo
 
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
-    raise RuntimeError("BOT_TOKEN missing")
+    raise RuntimeError("❌ BOT_TOKEN missing")
 
 PORT = int(os.getenv("PORT", 10000))
 URL = os.getenv("RENDER_EXTERNAL_URL")
 
 if not URL:
-    raise RuntimeError("RENDER_EXTERNAL_URL missing")
+    raise RuntimeError("❌ RENDER_EXTERNAL_URL missing")
 
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{URL}{WEBHOOK_PATH}"
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    level=logging.INFO,
+)
+
 logger = logging.getLogger("nitropix")
 
 
 # ==============================
-# TELEGRAM APP
+# TELEGRAM APPLICATION
 # ==============================
 
 telegram_app = Application.builder().token(TOKEN).build()
 
+# COMMAND
 telegram_app.add_handler(CommandHandler("start", start))
 
+# BUTTONS
 telegram_app.add_handler(
     CallbackQueryHandler(effect_selector, pattern="^effect_")
 )
@@ -61,6 +67,7 @@ telegram_app.add_handler(
     CallbackQueryHandler(button_handler)
 )
 
+# PHOTO HANDLER
 telegram_app.add_handler(
     MessageHandler(filters.PHOTO, handle_photo)
 )
@@ -75,41 +82,44 @@ async def telegram_webhook(request):
         data = await request.json()
 
         update = Update.de_json(data, telegram_app.bot)
+
+        # Enviar update al bot
         await telegram_app.update_queue.put(update)
 
         return JSONResponse({"status": "ok"})
 
     except Exception as e:
-        logger.exception("Webhook error")
+        logger.exception("❌ Webhook error")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # ==============================
-# HEALTHCHECK (⭐ CLAVE PARA UPTIMEROBOT)
+# HEALTHCHECK (UPTIMEROBOT)
 # ==============================
 
 async def health(request):
-    return PlainTextResponse(
-        "NitroPix alive",
-        status_code=200
-    )
+    return PlainTextResponse("NitroPix alive", status_code=200)
 
 
 # ==============================
-# STARTUP
+# STARTUP (🔥 CLAVE)
 # ==============================
 
 async def startup():
 
     logger.info("🚀 Starting NitroPix...")
 
+    # Inicializar Telegram
     await telegram_app.initialize()
-    await telegram_app.start()
 
+    # Evitar doble ejecución en Render
+    if not telegram_app.running:
+        await telegram_app.start()
+
+    # Activar webhook
     await telegram_app.bot.set_webhook(
         url=WEBHOOK_URL,
         drop_pending_updates=True,
-        allowed_updates=Update.ALL_TYPES,
     )
 
     logger.info("✅ Webhook activo:")
@@ -117,12 +127,15 @@ async def startup():
 
 
 # ==============================
-# SHUTDOWN (EVITA ERRORES RENDER)
+# SHUTDOWN LIMPIO
 # ==============================
 
 async def shutdown():
-    logger.info("🛑 Shutting down bot...")
-    await telegram_app.stop()
+    logger.info("🛑 Shutting down NitroPix...")
+
+    if telegram_app.running:
+        await telegram_app.stop()
+
     await telegram_app.shutdown()
 
 
@@ -143,7 +156,7 @@ app = Starlette(
 
 
 # ==============================
-# RUN LOCAL
+# RUN LOCAL (NO AFECTA RENDER)
 # ==============================
 
 if __name__ == "__main__":
