@@ -5,3 +5,5 @@ Pillow
 aiohttp
 flask
 requests
+starlette==0.37.2
+uvicorn==0.30.1
