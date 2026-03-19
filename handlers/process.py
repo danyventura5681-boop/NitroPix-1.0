@@ -11,6 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 # =====================================================
+# PROCESS MENU (FIX FOR ROUTER IMPORT)
+# =====================================================
+
+async def process_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Alias para evitar error de import en router.py
+    """
+    await process_photo(update, context)
+
+
+# =====================================================
 # PROCESS PHOTO MENU
 # =====================================================
 
@@ -35,7 +46,6 @@ async def process_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     lang = db_user.get("language", "en")
-
     credits = db_user.get("credits", 0)
 
     # =============================
