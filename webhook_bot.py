@@ -8,7 +8,18 @@ from starlette.routing import Route
 import uvicorn
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+
+# IMPORTAR HANDLERS REALES
+from handlers.start import start, button_handler, effect_selector
+from handlers.effects import handle_photo
 
 
 # ==============================
@@ -17,22 +28,15 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
-    raise ValueError("❌ No BOT_TOKEN found in environment variables")
+    raise ValueError("❌ BOT_TOKEN missing")
 
 PORT = int(os.environ.get("PORT", 8000))
 URL = os.environ.get("RENDER_EXTERNAL_URL")
 
-if not URL:
-    raise ValueError("❌ RENDER_EXTERNAL_URL no definida")
-
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{URL}{WEBHOOK_PATH}"
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -42,22 +46,25 @@ logger = logging.getLogger(__name__)
 
 telegram_app = Application.builder().token(TOKEN).build()
 
-
-# ==============================
 # COMMANDS
-# ==============================
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "✅ NitroPix funcionando correctamente en Render 🚀"
-    )
-
-
 telegram_app.add_handler(CommandHandler("start", start))
 
+# BUTTONS
+telegram_app.add_handler(
+    CallbackQueryHandler(effect_selector, pattern="^effect_")
+)
+telegram_app.add_handler(
+    CallbackQueryHandler(button_handler)
+)
+
+# PHOTO HANDLER
+telegram_app.add_handler(
+    MessageHandler(filters.PHOTO, handle_photo)
+)
+
 
 # ==============================
-# WEBHOOK HANDLER
+# WEBHOOK
 # ==============================
 
 async def telegram_webhook(request):
@@ -65,48 +72,39 @@ async def telegram_webhook(request):
         data = await request.json()
 
         update = Update.de_json(data, telegram_app.bot)
+        await telegram_app.update_queue.put(update)
 
-        # 🔥 enviar update al dispatcher ACTIVO
-        await telegram_app.process_update(update)
-
-        return Response("ok", status_code=200)
+        return Response("ok")
 
     except Exception as e:
-        logger.exception("❌ Error en webhook")
+        logger.error(e)
         return Response("error", status_code=500)
 
 
 # ==============================
-# HEALTH CHECK
+# HEALTHCHECK
 # ==============================
 
-async def health_check(request):
-    return PlainTextResponse("OK", status_code=200)
+async def health(request):
+    return PlainTextResponse("OK")
 
 
 # ==============================
-# STARTUP / SHUTDOWN
+# STARTUP (🔥 FIX PRINCIPAL)
 # ==============================
 
 async def startup():
-    logger.info("🚀 Inicializando bot...")
 
     await telegram_app.initialize()
-    await telegram_app.start()   # ⭐ ESTA ERA LA PIEZA FALTANTE
+    await telegram_app.start()   # ⭐ ESTA LÍNEA ARREGLA TODO
 
     await telegram_app.bot.set_webhook(
         url=WEBHOOK_URL,
         drop_pending_updates=True,
     )
 
-    logger.info(f"✅ Webhook configurado: {WEBHOOK_URL}")
-    logger.info("✅ Bot listo para recibir mensajes")
-
-
-async def shutdown():
-    logger.info("🛑 Cerrando bot...")
-    await telegram_app.stop()
-    await telegram_app.shutdown()
+    logger.info("✅ Webhook activo")
+    logger.info(WEBHOOK_URL)
 
 
 # ==============================
@@ -116,19 +114,17 @@ async def shutdown():
 app = Starlette(
     routes=[
         Route(WEBHOOK_PATH, telegram_webhook, methods=["POST"]),
-        Route("/health", health_check, methods=["GET"]),
-        Route("/healthcheck", health_check, methods=["GET"]),
-        Route("/", health_check, methods=["GET"]),
+        Route("/", health),
+        Route("/health", health),
+        Route("/healthcheck", health),
     ],
     on_startup=[startup],
-    on_shutdown=[shutdown],
 )
 
 
 # ==============================
-# RUN SERVER
+# RUN
 # ==============================
 
 if __name__ == "__main__":
-    logger.info(f"🌐 Servidor iniciado en puerto {PORT}")
     uvicorn.run(app, host="0.0.0.0", port=PORT)
