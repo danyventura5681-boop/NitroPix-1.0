@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from database import get_user
 from utils.i18n import get_text
 
-async def referral_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def referral_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
