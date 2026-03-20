@@ -1,24 +1,19 @@
 import sqlite3
-from pathlib import Path
-from datetime import datetime, timedelta
+import os
 
-DB_PATH = Path("nitropix.db")
+DB_FILE = "users.db"
 
 
-# ==============================
+# ===============================
 # CONEXIÓN
-# ==============================
-
+# ===============================
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return sqlite3.connect(DB_FILE)
 
 
-# ==============================
-# CREAR TABLAS
-# ==============================
-
+# ===============================
+# CREAR TABLA
+# ===============================
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
@@ -26,9 +21,7 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
-            credits INTEGER DEFAULT 5,
-            language TEXT DEFAULT 'en',
-            last_daily TEXT
+            credits INTEGER DEFAULT 5
         )
     """)
 
@@ -36,56 +29,48 @@ def init_db():
     conn.close()
 
 
-init_db()
-
-
-# ==============================
-# HELPERS
-# ==============================
-
-def row_to_dict(row):
-    if row is None:
-        return None
-    return dict(row)
-
-
-# ==============================
-# USUARIOS
-# ==============================
-
+# ===============================
+# OBTENER USUARIO
+# (lo crea automáticamente si no existe)
+# ===============================
 def get_user(user_id: int):
+
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM users WHERE user_id=?",
+        "SELECT user_id, credits FROM users WHERE user_id = ?",
         (user_id,)
     )
+    row = cursor.fetchone()
 
-    user = cursor.fetchone()
-
-    if not user:
+    # ✅ Crear usuario automáticamente
+    if not row:
         cursor.execute(
-            "INSERT INTO users (user_id) VALUES (?)",
-            (user_id,)
+            "INSERT INTO users (user_id, credits) VALUES (?, ?)",
+            (user_id, 5)
         )
         conn.commit()
 
         cursor.execute(
-            "SELECT * FROM users WHERE user_id=?",
+            "SELECT user_id, credits FROM users WHERE user_id = ?",
             (user_id,)
         )
-        user = cursor.fetchone()
+        row = cursor.fetchone()
 
     conn.close()
-    return row_to_dict(user)
+
+    return {
+        "user_id": row[0],
+        "credits": row[1]
+    }
 
 
-# ==============================
-# CRÉDITOS
-# ==============================
+# ===============================
+# AGREGAR CRÉDITOS
+# ===============================
+def add_credits(user_id: int, amount: int = 1):
 
-def add_credits(user_id: int, amount: int):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -99,6 +84,9 @@ def add_credits(user_id: int, amount: int):
     conn.close()
 
 
+# ===============================
+# RESTAR CRÉDITOS (FUNCIÓN REAL)
+# ===============================
 def deduct_diamond(user_id: int, amount: int = 1):
 
     user = get_user(user_id)
@@ -124,56 +112,9 @@ def deduct_diamond(user_id: int, amount: int = 1):
     return True
 
 
-def get_credits(user_id: int) -> int:
-    user = get_user(user_id)
-    return user["credits"]
-
-
-# ==============================
-# LANGUAGE
-# ==============================
-
-def set_language(user_id: int, lang: str):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE users
-        SET language = ?
-        WHERE user_id = ?
-    """, (lang, user_id))
-
-    conn.commit()
-    conn.close()
-
-
-# ==============================
-# DAILY REWARD
-# ==============================
-
-def can_claim_daily(user_id: int) -> bool:
-
-    user = get_user(user_id)
-    last_claim = user["last_daily"]
-
-    if not last_claim:
-        return True
-
-    last_date = datetime.fromisoformat(last_claim)
-
-    return datetime.utcnow() - last_date >= timedelta(hours=24)
-
-
-def set_daily_claimed(user_id: int):
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE users
-        SET last_daily = ?
-        WHERE user_id = ?
-    """, (datetime.utcnow().isoformat(), user_id))
-
-    conn.commit()
-    conn.close()
+# ===============================
+# ✅ ALIAS PARA COMPATIBILIDAD
+# (usado por effects.py)
+# ===============================
+def remove_credits(user_id: int, amount: int = 1):
+    return deduct_diamond(user_id, amount)
