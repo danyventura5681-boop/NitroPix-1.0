@@ -12,14 +12,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
 
-    # Crear usuario automáticamente
     db.get_user(user.id)
-
     credits = db.get_credits(user.id)
 
     keyboard = [
-        [InlineKeyboardButton("🎨 Efectos", callback_data="menu_effects")],
-        [InlineKeyboardButton("💳 Créditos", callback_data="menu_credits")],
+        [InlineKeyboardButton("🎨 Efectos", callback_data="process")],
+        [InlineKeyboardButton("💳 Panel", callback_data="panel")],
     ]
 
     await update.message.reply_text(
@@ -31,7 +29,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ==============================
-# BUTTON HANDLER
+# PANEL HANDLER
 # ==============================
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -39,31 +37,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    if query.data == "menu_credits":
+    user_id = query.from_user.id
+    credits = db.get_credits(user_id)
 
-        user_id = query.from_user.id
-        credits = db.get_credits(user_id)
+    keyboard = [
+        [InlineKeyboardButton("🎨 Efectos", callback_data="process")],
+        [InlineKeyboardButton("💳 Recargar", callback_data="recharge")],
+        [InlineKeyboardButton("🎁 Referidos", callback_data="referral")],
+    ]
 
-        await query.edit_message_text(
-            f"💳 Créditos actuales: {credits}\n\n"
-            "Cada efecto consume 1 crédito."
-        )
-
-    elif query.data == "menu_effects":
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "✨ Próximamente",
-                    callback_data="effect_comingsoon",
-                )
-            ]
-        ]
-
-        await query.edit_message_text(
-            "🎨 Selecciona un efecto:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
+    await query.edit_message_text(
+        f"🏠 Panel principal\n\n"
+        f"💎 Créditos: {credits}",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
 
 
 # ==============================
